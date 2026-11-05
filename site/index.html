@@ -140,7 +140,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 
   const cpu = arm ? 'arm64' : 'x86_64';
   const suffix = os === 'linux' ? `linux-${arm ? 'aarch64' : cpu}.deb`
-    : `${os}-${os === 'windows' ? 'x86_64' : cpu}.zip`;
+    : `${os}-${os === 'windows' ? 'x86_64' : cpu}.${os === 'macos' ? 'dmg' : 'zip'}`;
   const label = os === 'macos' ? `macOS · ${arm ? 'Apple Silicon' : 'Intel'}`
     : os === 'windows' ? 'Windows · x64' : `Linux · ${arm ? 'ARM64' : 'x64'} (.deb)`;
   // Derive the asset from the static release link, keeping one version to update.
@@ -149,8 +149,8 @@ figure.shot img { display: block; width: 100%; height: auto; }
   button.textContent = `Download for ${label}`;
   // Published GitHub asset sizes in bytes; refresh alongside each release.
   const sizes = {
-    'macos-arm64.zip': 150385469,
-    'macos-x86_64.zip': 154867942,
+    'macos-arm64.dmg': 155910722,
+    'macos-x86_64.dmg': 160976676,
     'windows-x86_64.zip': 165351502,
     'linux-x86_64.deb': 108194890,
     'linux-aarch64.deb': 107695398
@@ -206,7 +206,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <h2>Installation</h2>
 <ol>
 <li>Install TeX Live or MiKTeX if you do not have it. On Windows, install it inside WSL2.</li>
-<li>Download the release for your platform above. On macOS, extract the signed, notarized app and move it to Applications. On Windows, extract the ZIP and run <code>texstudio.exe</code> (the Windows build is unsigned). On Linux, install the <code>.deb</code> with your package manager.</li>
+<li>Download the release for your platform above. On macOS, open the signed, notarized DMG and drag TeXstudio Espresso to Applications. On Windows, extract the ZIP and run <code>texstudio.exe</code> (the Windows build is unsigned). On Linux, install the <code>.deb</code> with your package manager.</li>
 <li>Open a saved <code>.tex</code> file. The preview appears next to the editor.</li>
 </ol>
 <p>To build from source, see the <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/README.md">build instructions</a>.</p>
@@ -214,7 +214,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 
 <section>
 <h2>Source and license</h2>
-<p>Free software. The editor is distributed under the GNU GPL, version 3; bundled components retain their own licenses, including AGPL, LGPL and permissive licenses. Matching source downloads and original notices accompany each <a href="https://github.com/DominikPeters/texstudio-espresso/releases">release</a>. Source code, build instructions and issue tracker are on <a href="https://github.com/DominikPeters/texstudio-espresso">GitHub</a>. Based on <a href="https://www.texstudio.org">TeXstudio</a> and on <a href="https://github.com/let-def/texpresso">TeXpresso</a> by Frédéric Bour.</p>
+<p>Free software. The editor is distributed under the GNU GPL, version 3; bundled components retain their own licenses, including AGPL, LGPL and permissive licenses. Exact source links, build recipes and original notices accompany each <a href="https://github.com/DominikPeters/texstudio-espresso/releases">release</a>. Source code, build instructions and issue tracker are on <a href="https://github.com/DominikPeters/texstudio-espresso">GitHub</a>. Based on <a href="https://www.texstudio.org">TeXstudio</a> and on <a href="https://github.com/let-def/texpresso">TeXpresso</a> by Frédéric Bour.</p>
 </section>
 
 <section>
