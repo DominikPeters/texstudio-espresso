@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import subprocess
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -17,6 +18,22 @@ from license_inventory import package_metadata
 
 
 class LicenseEvidence(unittest.TestCase):
+    def test_retained_notice_manifests_match_tracked_source_files(self):
+        root = license_evidence.ROOT
+        tracked = set(subprocess.check_output(
+            ['git', '-C', str(root), 'ls-files', '-z', '--', 'native/notices'], text=True).split('\0'))
+        for group in ['qt', 'library-sources']:
+            base = root / 'native/notices' / group
+            for record in json.loads((base / 'manifest.json').read_text()):
+                source = base / record['package']
+                for entry in record['files']:
+                    file = source / entry['path']
+                    with self.subTest(file=str(file.relative_to(root))):
+                        self.assertTrue(file.resolve().is_relative_to(source.resolve()))
+                        self.assertIn(file.relative_to(root).as_posix(), tracked,
+                                      'Declared notice must survive git archive / a clean CI checkout')
+                        self.assertEqual(license_evidence.sha256(file), entry['sha256'])
+
     def test_qt_rebuild_reuses_notices_only_for_identical_upstream_source(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

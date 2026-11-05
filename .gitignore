@@ -43,3 +43,6 @@ __pycache__/
 .native-sources/
 dist/
 notarization/
+
+# Original redistribution notices are source inputs, including upstream build folders.
+!native/notices/**
