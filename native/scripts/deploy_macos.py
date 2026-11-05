@@ -182,6 +182,10 @@ def main():
     plist.setdefault('CFBundleVersion', plist['CFBundleShortVersionString'])
     with plist_path.open('wb') as stream:
         plistlib.dump(plist, stream)
+    from macos_icon import install as install_icon
+    install_icon(app)
+    # Retain the icon selection when the final version fields are written.
+    plist = plistlib.loads(plist_path.read_bytes())
     runtime = app / 'Contents/Helpers/texpresso'
     metadata = app / 'Contents/Resources/texpresso'
     metadata.mkdir(parents=True)

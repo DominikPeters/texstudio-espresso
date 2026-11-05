@@ -1,3 +1,4 @@
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -29,8 +30,17 @@ class ReleaseAssembly(unittest.TestCase):
                         'engineRevision': 'engine-commit', 'inputs': [dependency]}
             with zipfile.ZipFile(root / (name + '-sources.zip'), 'w') as archive:
                 archive.writestr('SOURCE-MANIFEST.json', json.dumps(manifest))
+                archive.writestr('project/texstudio.tar.gz', gzip.compress(b'editor source', mtime=number))
+                archive.writestr('project/texpresso.tar.gz', gzip.compress(b'engine source', mtime=0))
             binary = root / (name + '.' + extension)
-            if extension == 'zip':
+            if extension == 'dmg':
+                binary.write_bytes(b'disk image fixture')
+                binary.with_name(binary.name + '.json').write_text(json.dumps({
+                    'sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
+                    'app': {'sourceRevision': 'release-commit', 'engineRevision': 'engine-commit'},
+                    'icon': {'AppIconCoffee.icns': 'verified'}, 'applicationsShortcut': '/Applications',
+                    'runtimeRequirements': {'minimumMacOSVersion': '15.0'}}))
+            elif extension == 'zip':
                 with zipfile.ZipFile(binary, 'w') as archive:
                     if target.startswith('macos'):
                         archive.writestr('TeXstudio Espresso.app/Contents/Resources/runtime-requirements.json', '{"minimumMacOSVersion":"15.0"}')
@@ -50,6 +60,10 @@ class ReleaseAssembly(unittest.TestCase):
             self.assertEqual(set(report['binaries']), set(TARGETS))
             self.assertEqual(report['dependencySourceCount'], 1)
             self.assertTrue((root / 'assets/SHA256SUMS').is_file())
+            self.assertEqual(len(list((root / 'assets').iterdir())), 9)
+            with zipfile.ZipFile(root / 'assets' / report['sources']) as source:
+                self.assertEqual(source.namelist().count('project/texstudio.tar.gz'), 1)
+                self.assertIn('dependency-sources/' + hashlib.sha256(b'exact dependency source').hexdigest() + '.source', source.namelist())
 
     def test_stale_source_and_missing_dependency_prevent_release(self):
         for wrong_source, omit_dependency, error in [(True, False, 'Source revision differs'), (False, True, 'Required dependency source missing')]:

@@ -114,8 +114,8 @@ if(APPLE)
 
     set(OSX_FILES
         texstudio.icns
-        native/icons/AppIcon.icns
-        native/icons/Assets.car
+        native/icons/alternatives/coffee/AppIconCoffee.icns
+        native/icons/alternatives/coffee/Assets.car
         utilities/latex2e.html
         utilities/latex2e.css
 		utilities/list.png

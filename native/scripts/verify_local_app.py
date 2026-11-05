@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 from deploy_macos import verify_dependencies
+from macos_icon import verify as verify_icon
 
 
 def main():
@@ -41,6 +42,7 @@ def main():
 
     try:
         run('signature', ['codesign', '--verify', '--deep', '--strict', app])
+        result['icon'] = verify_icon(app)
         verify_dependencies(app)
         with tempfile.TemporaryDirectory(prefix='texstudio-verify-profile-') as profile:
             run('version', [main_exe, '--config', profile, '--no-session', '--start-always', '--version'])

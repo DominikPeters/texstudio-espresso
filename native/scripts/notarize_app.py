@@ -11,6 +11,8 @@ from pathlib import Path
 from common import sha256
 from deploy_macos import macho_files, refresh_engine_manifest, verify_dependencies
 from notarize import command, imported_identity, notarize, signing_credentials
+from macos_icon import verify as verify_icon
+from package_macos import create_dmg, inspect_dmg
 
 
 def staple_ticket(app, reports, action, *, attempts=6):
@@ -72,17 +74,18 @@ def sign_app(app, identity, keychain, *, adhoc=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app', type=Path, required=True)
-    parser.add_argument('--output', type=Path, required=True, help='Final ZIP with a stapled app')
+    parser.add_argument('--output', type=Path, required=True, help='Final DMG or ZIP with a stapled app')
     parser.add_argument('--reports', type=Path, required=True)
     parser.add_argument('--timeout', default='20m')
     args = parser.parse_args()
     if platform.system() != 'Darwin':
         parser.error('Signing and notarization require macOS')
     app = args.app.resolve()
-    if args.output.exists() or args.output.suffix != '.zip':
-        parser.error('Choose a new .zip output path')
+    if args.output.exists() or args.output.suffix not in ('.zip', '.dmg'):
+        parser.error('Choose a new .dmg or .zip output path')
     # Inspect all code and dependencies before importing credentials.
     verify_dependencies(app)
+    verify_icon(app)
     if not (app / 'Contents/Resources/texpresso/build-manifest.json').is_file():
         parser.error('The application must include its engine runtime')
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -92,16 +95,28 @@ def main():
         with tempfile.TemporaryDirectory(prefix='texstudio-notary-upload-', dir=os.environ.get('RUNNER_TEMP')) as folder:
             upload = Path(folder) / 'submission.zip'
             command(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', app, upload])
-            notarize(upload, args.reports, keychain, args.timeout)
+            notarize(upload, args.reports / 'app', keychain, args.timeout)
             (args.reports / 'submitted-archive.sha256').write_text(sha256(upload) + '\n')
         staple_ticket(app, args.reports, 'staple')
         staple_ticket(app, args.reports, 'validate')
         command(['codesign', '--verify', '--deep', '--strict', '--verbose=2', app])
         command(['spctl', '--assess', '--type', 'execute', '--verbose=2', app])
-        # Archive only after stapling. ditto preserves framework symlinks, modes,
-        # resource forks and the ticket; upload-artifact wraps this intact ZIP.
-        command(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', app, args.output.resolve()])
-        args.output.with_suffix('.zip.sha256').write_text(f'{sha256(args.output)}  {args.output.name}\n')
+        # The app ticket survives copying from the DMG and supports offline use.
+        if args.output.suffix == '.dmg':
+            create_dmg(app, args.output.resolve())
+            command(['codesign', '--force', '--sign', imported_identity(identity, keychain),
+                     '--timestamp', '--keychain', keychain, args.output.resolve()])
+            notarize(args.output.resolve(), args.reports / 'dmg', keychain, args.timeout)
+            staple_ticket(args.output.resolve(), args.reports / 'dmg', 'staple')
+            staple_ticket(args.output.resolve(), args.reports / 'dmg', 'validate')
+            command(['codesign', '--verify', '--strict', args.output.resolve()])
+            command(['spctl', '--assess', '--type', 'open', '--context',
+                     'context:primary-signature', '--verbose=2', args.output.resolve()])
+            report = inspect_dmg(args.output.resolve())
+            args.output.with_name(args.output.name + '.json').write_text(json.dumps(report, indent=2) + '\n')
+        else:
+            command(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', app, args.output.resolve()])
+        args.output.with_name(args.output.name + '.sha256').write_text(f'{sha256(args.output)}  {args.output.name}\n')
     print('Signed, notarized and stapled:', args.output)
 
 

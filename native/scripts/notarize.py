@@ -144,7 +144,7 @@ def notarize(archive, reports, keychain, timeout):
         status = None
     if waited.returncode or status != 'Accepted':
         raise RuntimeError(f'Apple has not accepted submission {submission_id} (status: {status or "unknown/timeout"}); see notarization diagnostics')
-    archive.with_suffix('.zip.sha256').write_text(f'{sha256(archive)}  {archive.name}\n')
+    archive.with_name(archive.name + '.sha256').write_text(f'{sha256(archive)}  {archive.name}\n')
     print(f'Apple accepted {archive.name}', flush=True)
 
 

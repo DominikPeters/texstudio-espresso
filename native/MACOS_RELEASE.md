@@ -39,7 +39,8 @@ uses QJSEngine; native TeX helpers do not receive it.
 
 The workflow submits a temporary ZIP to Apple and requires explicit `Accepted`
 status. It then staples and validates the ticket, checks Gatekeeper and strict
-code signatures, exercises the signed engine, and uploads the final ZIP plus
+code signatures, exercises the signed engine, and packages a signed, notarized DMG with an Applications shortcut, Finder icon
+layout and coffee-cup artwork. It uploads the final DMG plus
 SHA-256 checksum and matching project-source ZIP. Reusable dependency sources are
 uploaded as a separate artifact. Source preparation runs before signing and
 fails if a required archive or patch is missing. Failed or timed-out notarization does not publish an app.
@@ -47,7 +48,11 @@ Diagnostics are uploaded separately. Both artifacts expire after 14 days.
 Ticket stapling and validation retry temporary ticket-service failures for a
 bounded time, recording verbose output from each attempt in the diagnostics.
 
-The ZIP preserves executable modes, Qt framework symlinks, and the stapled ticket.
+The disk image preserves executable modes, Qt framework symlinks, and the stapled
+app ticket. The disk image itself is signed, notarized and stapled too. The final
+image is mounted read-only with `-nobrowse` for signature/icon/shortcut checks and
+offscreen app/engine startup. `dmgbuild==1.6.7` creates the layout without Finder
+automation.
 `Contents/Resources/texpresso-release.json` identifies the source and engine
 commits. Engine notices and its refreshed binary manifest live under
 `Contents/Resources/texpresso`; only executable code remains in
@@ -78,11 +83,12 @@ per-payload dictionary provenance, and artwork/template notices. Public binary
 distributions must provide clear access to matching project and dependency
 sources from the binary download page. `*-sources.zip` contains the editor,
 recursive engine source, dependency manifest, patches, notices and build recipes.
-`dependency-sources/` contains original upstream sources under stable SHA256
-filenames, plus a browsable index. Reuse those files across releases and
-architectures; keep access to versions referenced by binaries still offered.
-When publishing, upload the project ZIP/checksum and link the required dependency
-files or equivalent exact-version sources. The two CI artifacts together hold
-the complete set; the project ZIP is intentionally smaller and not self-contained.
-It does not require the engine revision to be separately published as a Git branch.
-See [licensing and source preparation](../docs/distribution-licensing.md).
+`dependency-sources/` is an internal reusable build cache. The product release
+assembler consolidates all platform project ZIPs and required dependencies into
+one complete `texstudio-espresso-<version>-sources.zip`; shared inputs appear
+only once. No separate source downloads are required. CI still uploads the
+per-platform source ZIP and dependency cache as intermediate artifacts. These
+must not be flattened into hundreds of public release assets. The combined ZIP
+provides offline restoration for each platform and retains the original hashes,
+patches, notices and build recipes. See [release publication](RELEASING.md) and
+[licensing and source preparation](../docs/distribution-licensing.md).

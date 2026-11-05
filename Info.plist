@@ -30,9 +30,9 @@
 		</dict>
 	</array>
 	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
+	<string>AppIconCoffee.icns</string>
 	<key>CFBundleIconName</key>
-	<string>AppIcon</string>
+	<string>AppIconCoffee</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>NSPrincipalClass</key>

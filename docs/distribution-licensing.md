@@ -8,19 +8,16 @@ records 96 Mach-O images, 34 dependency packages and all 96 dictionary/thesaurus
 archives. This inventories the tested arm64 macOS package. Intel CI is prepared
 but was not run for this work; Linux needs its own actual dependency inventory.
 
-The candidate is staged at
-`.native-sources/app-updates/current/TeXstudio Espresso.app`; it has an ad-hoc
-signature and has not been installed, notarized or published. Its project source
-archive is `.native-sources/releases/texstudio-espresso-macos-arm64-sources.zip`,
-with an adjacent SHA256 file. Reusable dependency sources live separately in
-`.native-sources/releases/dependency-sources/` with a browsable index.
-**The binary download page must identify the matching project sources and exact
-dependency sources.** These need not be a single ZIP or hosted on one server;
-access to the matching versions must remain available. This follows
-[GNU's source-on-another-server guidance](https://www.gnu.org/licenses/gpl-faq.en.html#SourceAndBinaryOnDifferentSites).
-The monolithic ZIP was a packaging choice, not a license requirement.
-A GitHub repository's default source download omits submodule contents.
-Release-channel terms need separate review if an app store is considered.
+The public release provides one complete
+`texstudio-espresso-<version>-sources.zip` alongside its binaries. It contains
+all project/dependency sources, exact platform manifests, patches and build
+recipes; common inputs are stored once. The per-platform project ZIPs and
+reusable dependency cache remain internal preparation artifacts. GitHub's
+automatic source archives omit submodule contents and do not replace this bundle.
+Access to the matching source versions is retained while binaries are offered.
+See [the release workflow](../native/RELEASING.md) for current publication and
+packaging-only replacement instructions. Release-channel terms need separate
+review if an app store is considered.
 
 ## Evidence and licensing basis
 
@@ -120,7 +117,7 @@ collects exact dependency sources/patches and regenerates source-derived notices
 before signing. It uploads the project source ZIP beside the binary, and the
 separate dependency files as another artifact. Source preparation still verifies
 every input; splitting delivery does not silently drop dependencies.
-The project ZIP includes editor/engine sources, exact dependency URLs/checksums,
+The internal project ZIP includes editor/engine sources, exact dependency URLs/checksums,
 patches, recipes, build configuration and notices. Dependency archive names use
 full SHA256 values and retain their original formats. Existing files are verified
 and reused rather than copied into each version's project ZIP. The index keeps
@@ -146,18 +143,15 @@ patches, editor compiler flags/CMake cache and the app's complete notice evidenc
 Source notices can be regenerated from verified inputs using
 `collect_qt_notices.py` and `collect_library_notices.py`, as in the workflow.
 
-Restore just the editor and engine offline with Python 3.12+ and Git:
+Restore a public release's editor, engine and native build inputs offline with
+Python 3.12+ and Git:
 
 ```sh
-python3 texstudio-espresso-macos-arm64-sources.zip --output ./espresso-source
+python3 texstudio-espresso-4.9.9-espresso-1-sources.zip --platform macos-arm64 --output ./source
 ```
 
-For native engine build inputs, also supply the separate source directory:
-
-```sh
-python3 texstudio-espresso-macos-arm64-sources.zip --output ./espresso-source-full \
-  --dependencies ./dependency-sources
-```
+This public ZIP includes the internal per-platform metadata and all exact
+upstream inputs; no dependency-source download or `--fetch` is necessary.
 
 Only MuPDF/LCMS2/zlib-ng snapshots are needed by this restore step. Missing files
 fail before extraction; add `--fetch` to explicitly retrieve those snapshots from

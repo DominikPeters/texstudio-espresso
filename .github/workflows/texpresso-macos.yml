@@ -67,6 +67,8 @@ jobs:
           echo "$(brew --prefix qt)/bin" >> "$GITHUB_PATH"
       - name: Check tooling contracts
         run: python3 -m unittest discover -s native/tests
+      - name: Install disk image packaging tools
+        run: python3 -m pip install 'dmgbuild==1.6.7'
       - name: Fetch locked MuPDF sources
         uses: actions/checkout@v7
         with:
@@ -183,7 +185,7 @@ jobs:
           APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
         run: |
           python3 native/scripts/notarize_app.py --app "$RUNNER_TEMP/deploy/TeXstudio Espresso.app" \
-            --output "dist/texstudio-espresso-${{ steps.source.outputs.version }}-macos-${{ matrix.architecture }}.zip" \
+            --output "dist/texstudio-espresso-${{ steps.source.outputs.version }}-macos-${{ matrix.architecture }}.dmg" \
             --reports notarization --timeout 25m
           python3 native/scripts/verify_local_app.py --app "$RUNNER_TEMP/deploy/TeXstudio Espresso.app" \
             --client-build build/src/texpresso --tests '.' --output packaged-verification
@@ -191,7 +193,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: texstudio-espresso-macos-${{ matrix.architecture }}-notarized
-          path: dist/*.zip*
+          path: |
+            dist/*.zip*
+            dist/*.dmg*
           if-no-files-found: error
           retention-days: 14
       - name: Upload reusable dependency sources

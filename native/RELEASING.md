@@ -18,12 +18,27 @@ Review the concrete draft and then publish it. The workflow does not install or
 restart a local app. The macOS release candidates are Developer ID signed,
 notarized and stapled; local development builds remain ad-hoc signed.
 
-Each binary is accompanied by its matching `-sources.zip`. The separate
-dependency sources are indexed in `dependency-sources-index.json` and `.html`;
-GitHub's automatic source archive is not a replacement for the recursive project
-source and exact dependency inputs. Preserve published source assets while the
-corresponding binaries remain distributed. The per-platform manifests bind the
-original package sources and checksums to the actually shipped package versions.
+The public release contains five app downloads and one complete
+`texstudio-espresso-<version>-sources.zip`, plus checksums and runtime/provenance
+metadata. Mac downloads are signed, notarized DMGs with the coffee-cup icon and
+an Applications shortcut. The source ZIP stores common editor/engine exports and
+each dependency archive once, with per-platform manifests, recipes, patches and
+notices. Restore offline with `python3 sources.zip --platform macos-arm64
+--output ./source` (Python 3.12+ and Git). The per-platform source ZIPs and
+checksum-named dependency cache remain internal CI artifacts. Do not upload them
+individually to the public app release. Preserve corresponding sources while
+binaries remain distributed.
+
+For a packaging-only correction to an existing release, run **Repackage existing
+TeXstudio Espresso release**. It verifies every original GitHub asset digest,
+retains the tested editor/engine/library build, refreshes the Mac icon, and
+re-signs/notarizes the app and DMG. Both DMGs are mounted without opening Finder;
+the shortcut, icon bytes, signatures, tickets and offscreen startup are checked.
+The final job verifies/deduplicates the complete source archive and saves a
+`repackaged-release` artifact for publication. It does not modify a public
+release automatically. The original code revision and additional packaging
+revision/patch remain recorded separately. Upload and verify all replacements
+before removing superseded assets; retain an offline source-restoration check.
 
 macOS requirements are derived from the maximum deployment target across all
 shipped Mach-O code images and written to `LSMinimumSystemVersion` and
@@ -36,5 +51,5 @@ portable ZIP and requires WSL2, plus TeX Live or MiKTeX inside the chosen
 distribution. No distribution-name whitelist is imposed.
 
 After publishing, update `site/index.html` with direct links to the released
-platform assets and their source index. Normal pushes deploy the static site
+platform assets, their download sizes and the complete source archive. Normal pushes deploy the static site
 through the scoped FTP workflow described in `site/README.md`.
