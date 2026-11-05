@@ -149,7 +149,12 @@ def package_notices(package, output, platform):
             value = line.split(' ', 1)[1]
             # Qt packages list thousands of headers/plugins. Convert only the
             # notice paths: cygpath is a separate native process on Windows.
-            if '/share/licenses/' not in value: continue
+            notice_name = value.rstrip('/').rsplit('/', 1)[-1]
+            extra_notice = '/share/' in value and re.fullmatch(
+                r'(?:licen[cs]e|copying|copyright|notice|authors)(?:[._-].*)?', notice_name, re.IGNORECASE)
+            # ICU keeps its original LICENSE below share/icu/<version> instead
+            # of the conventional share/licenses directory.
+            if '/share/licenses/' not in value and not extra_notice: continue
             path = host_path(value)
             if path.is_file(): paths.append(path)
     if not paths:

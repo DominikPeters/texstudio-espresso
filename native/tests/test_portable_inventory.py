@@ -71,3 +71,12 @@ class PortableInventory(unittest.TestCase):
                 result = package_notices('qt', root / 'notices', 'windows')
             convert.assert_called_once_with('/ucrt64/share/licenses/qt6-base/LICENSE')
             self.assertEqual(Path(result[0]).read_text(), 'original notice')
+
+    def test_windows_icu_notice_outside_conventional_license_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); notice = root / 'LICENSE'; notice.write_text('ICU original notice')
+            listing = 'icu /ucrt64/include/unicode/platform.h\nicu /ucrt64/share/icu/78.3/LICENSE\n'
+            with patch('portable_inventory.run', return_value=listing), patch('portable_inventory.host_path', return_value=notice) as convert:
+                result = package_notices('icu', root / 'notices', 'windows')
+            convert.assert_called_once_with('/ucrt64/share/icu/78.3/LICENSE')
+            self.assertEqual(Path(result[0]).read_text(), 'ICU original notice')
