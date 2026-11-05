@@ -102,7 +102,7 @@ jobs:
             engine-license-evidence/
             engine-dependency-sources/
           retention-days: 30
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-wsl-linux-engine
           path: engine-linux-x86_64.tar.gz
@@ -244,14 +244,14 @@ jobs:
           path: dist/*.zip*
           if-no-files-found: error
           retention-days: 30
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TeXstudio-Espresso-Windows-WSL-development
           path: dist/TeXstudio-Espresso/
           retention-days: 7
       - name: Save integration diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-wsl-diagnostics
           path: |
