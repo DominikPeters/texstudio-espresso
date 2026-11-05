@@ -3,6 +3,12 @@
 The static files in this directory are served at
 <https://pref.tools/texstudio-espresso/>. No build step is needed.
 
+The download picker selects macOS, Windows or Linux using browser platform
+information. Visitors can choose another platform or show all downloads. Mobile
+and unrecognized browsers show all platforms, as does the page without
+JavaScript. Both Mac and Linux CPU options remain available because browser
+platform strings do not reliably identify the CPU architecture.
+
 The **Deploy website** GitHub Actions workflow publishes changes to `site/` on
 `main`. It can also be run manually, with an optional dry run. Pull requests
 validate the page and its local image references without accessing FTP secrets.
