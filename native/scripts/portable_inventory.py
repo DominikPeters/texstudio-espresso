@@ -18,6 +18,7 @@ import sys
 import tempfile
 import urllib.request
 import urllib.parse
+import zipfile
 
 from common import ROOT, run, sha256
 from license_evidence import dictionary_evidence, copy_dictionary_notices
@@ -253,7 +254,9 @@ def collect(args):
     dictionaries = []
     for archive in root.rglob('*.zip'):
         if not archive.name.endswith(('.dic.zip', '.dat.zip')): continue
-        record = dictionary_evidence(archive, dictionary_records)
+        with zipfile.ZipFile(archive) as packed:
+            record = dictionary_evidence(packed, dictionary_records)
+        if record is None: raise ValueError('Missing dictionary licensing evidence: ' + str(archive))
         copy_dictionary_notices(record, output / 'dictionaries')
         dictionaries.append(record)
     result = {'schema': 1, 'platform': args.platform,

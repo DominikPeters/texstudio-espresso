@@ -4,9 +4,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source, package_notices
+from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source, package_notices, collect
 import subprocess
 import tempfile
+import hashlib
+import json
+import zipfile
+from types import SimpleNamespace
 
 
 class PortableInventory(unittest.TestCase):
@@ -80,3 +84,36 @@ class PortableInventory(unittest.TestCase):
                 result = package_notices('icu', root / 'notices', 'windows')
             convert.assert_called_once_with('/ucrt64/share/icu/78.3/LICENSE')
             self.assertEqual(Path(result[0]).read_text(), 'ICU original notice')
+
+    def test_full_inventory_opens_dictionary_archive_and_copies_bound_notices(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); app = root / 'app'; app.mkdir()
+            (app / 'texstudio').write_bytes(b'\x7fELF' + bytes(20))
+            engine = root / 'engine'; (engine / 'notices').mkdir(parents=True)
+            (engine / 'notices/LICENSE').write_text('engine attribution')
+            (engine / 'build-manifest.json').write_text(json.dumps({'engineRevision': 'engine-commit'}))
+            (root / 'native/notices/assets').mkdir(parents=True)
+            (root / 'native/asset-provenance.json').write_text('{}')
+            (root / 'native/license-components.json').write_text('[]')
+            (root / 'COPYING').write_text('editor license')
+            (root / 'ESPRESSO-CHANGES.md').write_text('modification notice')
+            (root / 'NOTICE').write_text('dictionary attribution')
+            content = b'word'
+            record = {'name': 'sample.dic', 'license': 'MIT',
+                      'members': [{'name': 'sample.dic', 'sha256': hashlib.sha256(content).hexdigest()}],
+                      'notices': [{'path': 'NOTICE'}]}
+            (root / 'native/dictionary-provenance.json').write_text(json.dumps({'dictionaries': [record]}))
+            with zipfile.ZipFile(app / 'sample.dic.zip', 'w') as archive:
+                archive.writestr('sample.dic', content)
+            args = SimpleNamespace(root=app, output=root / 'output', cache=root / 'cache',
+                                   engine=engine, engine_evidence=None, platform='linux', fetch=False,
+                                   apt_source_root='https://archive.ubuntu.com/ubuntu')
+            def command(args, **kwargs):
+                if args[0] == 'readelf': return 'Name: GLIBC_2.38'
+                return 'engine-commit' if args[-1] == 'HEAD:native/texpresso' else 'editor-commit'
+            with patch('portable_inventory.ROOT', root), patch('license_evidence.ROOT', root), patch('portable_inventory.run', side_effect=command):
+                collect(args)
+            data = json.loads((root / 'output/inventory.json').read_text())
+            self.assertEqual(data['dictionaries'], [record])
+            self.assertEqual((root / 'output/dictionaries/NOTICE').read_text(), 'dictionary attribution')
+            self.assertTrue((root / 'output/index.html').is_file())

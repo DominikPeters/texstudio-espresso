@@ -49,6 +49,8 @@ class LicenseEvidence(unittest.TestCase):
                       'notices': [{'path': 'NOTICE'}]}
             with patch.object(license_evidence, 'ROOT', root), zipfile.ZipFile(path) as archive:
                 self.assertEqual(license_evidence.dictionary_evidence(archive, [record]), record)
+                archive.filename = r'C:\dictionary cache\en_US.dic.zip'
+                self.assertEqual(license_evidence.dictionary_evidence(archive, [record]), record)
                 record['members'][0]['sha256'] = '0' * 64
                 with self.assertRaisesRegex(ValueError, 'Dictionary changed'):
                     license_evidence.dictionary_evidence(archive, [record])

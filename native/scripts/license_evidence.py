@@ -58,7 +58,7 @@ def copy_library_notices(key, package, destination):
 
 def dictionary_evidence(archive, records):
     """Bind a license notice to exact decompressed payloads, rejecting stale data."""
-    name = archive.filename.rsplit('/', 1)[-1].removesuffix('.zip')
+    name = archive.filename.replace('\\', '/').rsplit('/', 1)[-1].removesuffix('.zip')
     record = next((r for r in records if r['name'] == name), None)
     if record is None:
         return None
