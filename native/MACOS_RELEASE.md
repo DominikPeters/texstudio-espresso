@@ -81,7 +81,7 @@ The platform plugins include `offscreen` for CI checks as well as Cocoa for user
 app/engine source revisions, original license texts and third-party attribution,
 per-payload dictionary provenance, and artwork/template notices. Public binary
 distributions must provide clear access to matching project and dependency
-sources from the binary download page. `*-sources.zip` contains the editor,
+sources from the binary download page. CI’s internal `*-sources.zip` contains the editor,
 recursive engine source, dependency manifest, patches, notices and build recipes.
 `dependency-sources/` is an internal verified build cache. Public releases link
 to exact project/engine/dependency sources instead of uploading that cache.

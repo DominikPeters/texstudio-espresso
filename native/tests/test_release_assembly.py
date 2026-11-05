@@ -68,7 +68,7 @@ class ReleaseAssembly(unittest.TestCase):
                 self.assertEqual(manifest['engine']['revision'], 'engine-commit')
             self.assertFalse(any(p.name.endswith('-sources.zip') for p in (root / 'assets').iterdir()))
 
-    def test_stale_source_and_missing_dependency_prevent_release(self):
+    def test_stale_source_prevents_release(self):
         for wrong_source, omit_dependency, error in [(True, False, 'Source revision differs')]:
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp); self.fixtures(root / 'inputs', wrong_source, omit_dependency)

@@ -152,7 +152,7 @@ the exact upstream dependencies; `source-info.zip` includes the applied patches,
 original build recipes and configuration. The commands above are internal source
 preparation/evidence commands, not a required multi-gigabyte public download.
 
-Only MuPDF/LCMS2/zlib-ng snapshots are needed by this restore step. Missing files
+The internal `unpack_source_release.py` helper can also restore MuPDF/LCMS2/zlib-ng snapshots. Missing files
 fail before extraction; add `--fetch` to explicitly retrieve those snapshots from
 the manifest's HTTPS URLs and verify their SHA256. Qt, Poppler and other sources
 remain individually accessible from the index/manifest for their own builds.
