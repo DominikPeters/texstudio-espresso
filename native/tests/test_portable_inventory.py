@@ -4,10 +4,23 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from portable_inventory import control_fields, pacman_fields, debian_source
+from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner
+import subprocess
+import tempfile
 
 
 class PortableInventory(unittest.TestCase):
+    def test_multilib_owner_must_match_actual_elf_class(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            elf64 = b'\x7fELF\x02\x01' + bytes(12) + b'\x3e\x00'
+            elf32 = b'\x7fELF\x01\x01' + bytes(12) + b'\x03\x00'
+            current = root / 'bundled.so'; current.write_bytes(elf64)
+            source = root / 'lib64.so'; source.write_bytes(elf64)
+            other = root / 'lib32.so'; other.write_bytes(elf32)
+            response = subprocess.CompletedProcess([], 0, f'lib32gcc-s1: {other}\nlibgcc-s1:amd64: {source}\n', '')
+            with patch('portable_inventory.subprocess.run', return_value=response), patch('portable_inventory.run', return_value='amd64'):
+                self.assertEqual(binary_owner(current, 'linux'), 'libgcc-s1:amd64')
     def test_package_metadata_preserves_source_checksums_and_multiline_fields(self):
         fields = control_fields('Package: example\nVersion: 2.1-4\nChecksums-Sha256:\n ' + 'a' * 64 + ' 100 source.tar.xz\nDirectory: pool/main/e/example\n')
         self.assertIn('source.tar.xz', fields['Checksums-Sha256'])

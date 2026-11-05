@@ -75,7 +75,10 @@ void AboutDialog::setText(QString latestVersion) {
                             "<a href=\""+changelogPath+"\">"+tr("Changelog")+"</a><br><br>"+
                             licensingLinks +
 	                        "Copyright (c)<br>" +
-	                        TEXSTUDIO + ": Benito van der Zander, Jan Sundermeyer, Daniel Braun, Tim Hoffmann<br>" +
+#ifdef TEXSTUDIO_TEXPRESSO
+                            "TeXstudio Espresso: Dominik Peters and contributors<br>" +
+#endif
+                            "TeXstudio: Benito van der Zander, Jan Sundermeyer, Daniel Braun, Tim Hoffmann<br>" +
 	                        "Texmaker: Pascal Brachet<br>" +
 	                        "QCodeEdit: Luc Bruant<br>" +
 	                        tr("html conversion: ") + QString::fromUtf8("Joël Amblard</i><br>") +

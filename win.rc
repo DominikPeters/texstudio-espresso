@@ -1,9 +1,16 @@
+#include "src/productversion.h"
+
 IDI_ICON1               ICON    DISCARDABLE     "texstudio.ico"
 
 
 1 VERSIONINFO
+#ifdef TEXSTUDIO_TEXPRESSO
+    FILEVERSION    4,9,9,1
+    PRODUCTVERSION 4,9,9,1
+#else
     FILEVERSION    0,0,0,0
     PRODUCTVERSION 0,0,0,0
+#endif
 {
     BLOCK "StringFileInfo"
     {
@@ -13,8 +20,13 @@ IDI_ICON1               ICON    DISCARDABLE     "texstudio.ico"
             VALUE "FileDescription",    "LaTeX editor\0"
             VALUE "FileVersion",        "git\0"
             VALUE "OriginalFilename",   "texstudio.exe\0"
+#ifdef TEXSTUDIO_TEXPRESSO
+            VALUE "ProductName",        "TeXstudio Espresso\0"
+            VALUE "ProductVersion",     TEXSTUDIO_ESPRESSO_VERSION "\0"
+#else
             VALUE "ProductName",        "TeXstudio\0"
             VALUE "ProductVersion",     "git\0"
+#endif
         }
     }
     BLOCK "VarFileInfo"

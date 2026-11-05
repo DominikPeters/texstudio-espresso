@@ -1,0 +1,48 @@
+name: Prepare TeXstudio Espresso release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: product-release
+  cancel-in-progress: false
+jobs:
+  macos:
+    uses: ./.github/workflows/texpresso-macos.yml
+    with:
+      architecture: both
+    secrets: inherit
+  linux:
+    uses: ./.github/workflows/texpresso-linux-release.yml
+  windows:
+    uses: ./.github/workflows/texpresso-windows.yml
+    with:
+      release: true
+  assemble:
+    needs: [macos, linux, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: texstudio-espresso-*
+          path: release-inputs
+      - name: Verify every application and corresponding source before drafting
+        run: |
+          python3 native/scripts/assemble_release.py --inputs release-inputs --output release-assets --revision "$GITHUB_SHA"
+      - name: Create draft with durable binary and source downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 native/scripts/product_release.py --field version)
+          gh release create "$version" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --draft --title "TeXstudio Espresso $version" --notes-file release-notes.md release-assets/*
+          echo "Draft prepared: https://github.com/$GITHUB_REPOSITORY/releases" >> "$GITHUB_STEP_SUMMARY"

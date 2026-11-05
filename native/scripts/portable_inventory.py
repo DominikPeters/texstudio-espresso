@@ -19,7 +19,7 @@ import urllib.request
 
 from common import ROOT, run, sha256
 from license_evidence import dictionary_evidence, copy_dictionary_notices
-from product_release import version
+from product_release import version, version_key
 import source_release
 
 
@@ -127,7 +127,20 @@ def binary_owner(file, platform):
         candidate = run(['cygpath', '-u', candidate], capture=True) if sys.platform == 'win32' else str(candidate)
         return run(['pacman', '-Qqo', candidate], capture=True)
     result = subprocess.run(['dpkg-query', '-S', '*/' + file.name], text=True, capture_output=True)
-    owners = sorted({line.split(': ')[0] for line in result.stdout.splitlines() if ': ' in line})
+    with file.open('rb') as stream: actual = stream.read(20)
+    owners = set()
+    for line in result.stdout.splitlines():
+        if ': ' not in line: continue
+        name, location = line.split(': ', 1)
+        candidate = Path(location)
+        if not candidate.is_file(): continue
+        with candidate.open('rb') as stream: header = stream.read(20)
+        # lib32gcc-s1 is itself an amd64 package but contains 32-bit ELFs.
+        # Match ELF class/byte order/machine, not just the package architecture.
+        if header[:6] == actual[:6] and header[18:20] == actual[18:20]: owners.add(name)
+    owners = sorted(owners)
+    architecture = run(['dpkg', '--print-architecture'], capture=True)
+    owners = [name for name in owners if ':' not in name or name.rsplit(':', 1)[1] == architecture]
     # Both /lib and /usr/lib paths can appear for the same merged-/usr package.
     if len(owners) != 1: raise ValueError(f'Ambiguous/unowned distributed ELF library: {file}: {owners}')
     return owners[0]
@@ -159,7 +172,11 @@ def collect(args):
                 notices = package_notices(package, output / 'notices' / package, args.platform)
                 packages[package] = {**record, 'noticeFiles': [str(Path(p).relative_to(output)) for p in notices]}
                 additional += record['records']
-        binaries.append({'path': str(file.relative_to(root)), 'sha256': sha256(file), 'package': package})
+        row = {'path': str(file.relative_to(root)), 'sha256': sha256(file), 'package': package}
+        if is_elf:
+            values = re.findall(r'Name: GLIBC_(\d+(?:\.\d+)+)', run(['readelf', '--version-info', file], capture=True))
+            if values: row['minimumGlibcVersion'] = max(values, key=version_key)
+        binaries.append(row)
     if not binaries: raise ValueError('No native binaries found in distribution')
     runtime = args.engine.resolve()
     manifest = json.loads((runtime / 'build-manifest.json').read_text())
@@ -193,6 +210,15 @@ def collect(args):
         'binaries': binaries, 'packageEvidence': packages, 'dictionaries': dictionaries,
         'sourceComponents': components,
         'releaseWorkRemaining': []}
+    if args.platform == 'linux':
+        result['runtimeRequirements'] = {'minimumGlibcVersion': max(
+            (r['minimumGlibcVersion'] for r in binaries if 'minimumGlibcVersion' in r), key=version_key)}
+    else:
+        result['runtimeRequirements'] = {'platform': 'windows', 'architecture': 'x86_64', 'requiresWSL2': True,
+            'engineMinimumGlibcVersion': inherited['runtimeRequirements']['minimumGlibcVersion'],
+            'wslInstallationRequirements': 'https://learn.microsoft.com/windows/wsl/install',
+            'qtPackages': {k: v['version'] for k, v in packages.items() if 'qt6-' in k}}
+        (root / 'runtime-requirements.json').write_text(json.dumps(result['runtimeRequirements'], indent=2) + '\n')
     (output / 'inventory.json').write_text(json.dumps(result, indent=2) + '\n')
     files = sorted(p for p in output.rglob('*') if p.is_file())
     links = ''.join('<li><a href="' + html.escape(str(p.relative_to(output)), quote=True) + '">' + html.escape(str(p.relative_to(output))) + '</a></li>' for p in files)

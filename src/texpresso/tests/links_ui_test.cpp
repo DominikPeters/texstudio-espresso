@@ -252,6 +252,7 @@ void LinksUiTest::realContinuousSecondaryPage()
     // Restore the first page so the next link still exercises a neighbor
     // canvas independently of the stale active-canvas geometry below.
     session->preview.navigateTo(0);
+    QTRY_VERIFY_WITH_TIMEOUT(session->preview.page() == 0 && session->preview.valid(), 15000);
     QTRY_VERIFY_WITH_TIMEOUT(findSecondary(), 15000);
     auto activeCanvas = widget.findChild<TexpressoCanvas *>("texpressoActivePage"); QVERIFY(activeCanvas);
     bool geometryReadyAtReveal = false;
@@ -269,7 +270,12 @@ void LinksUiTest::realContinuousSecondaryPage()
     QTest::mouseClick(secondary, Qt::LeftButton, Qt::NoModifier,
         ((internalCenter - secondary->pageBounds.topLeft()) * secondary->scale).toPoint());
     QCOMPARE(internalClicks.size(), 1);
-    QTRY_VERIFY_WITH_TIMEOUT(session->preview.page() == 0 && session->preview.valid() && geometryReadyAtReveal, 15000);
+    QTRY_VERIFY2_WITH_TIMEOUT(session->preview.page() == 0 && session->preview.valid() && geometryReadyAtReveal,
+        qPrintable(QString("page=%1 valid=%2 geometryReady=%3 canvas=%4,%5,%6,%7 bounds=%8,%9,%10,%11\n%12")
+            .arg(session->preview.page()).arg(session->preview.valid()).arg(geometryReadyAtReveal)
+            .arg(activeCanvas->pageBounds.x()).arg(activeCanvas->pageBounds.y()).arg(activeCanvas->pageBounds.width()).arg(activeCanvas->pageBounds.height())
+            .arg(session->preview.bounds().x()).arg(session->preview.bounds().y()).arg(session->preview.bounds().width()).arg(session->preview.bounds().height())
+            .arg(session->engineOutput.right(3000))), 15000);
     const auto destinations = session->preview.annotationsForPage(0).value("destinations").toArray();
     const auto destination = std::find_if(destinations.begin(), destinations.end(), [](const QJsonValue &item) {
         return item.toObject().value("name").toString() == "first";

@@ -1,5 +1,10 @@
 name: Windows WSL live preview
 on:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: true
   push:
     branches: [main]
   pull_request:
