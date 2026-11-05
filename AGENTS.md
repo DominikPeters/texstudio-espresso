@@ -2,7 +2,9 @@
 
 - The standalone product is `DominikPeters/texstudio-espresso`; `origin` points
   there and `main` is its development/default branch. Use this repository for
-  Espresso issues, pull requests, Actions and releases.
+  TeXstudio Espresso issues, pull requests, Actions and releases.
+- Always call the app **TeXstudio Espresso**, never just **Espresso**, in prose,
+  website copy and user-facing labels.
 - `contributions` points to `DominikPeters/texstudio`, the existing GitHub fork
   for upstream contributions. Base generic fixes on `upstream/master` and push
   their focused branches to `contributions`.

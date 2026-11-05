@@ -55,7 +55,7 @@ header.site .wrap { padding-top: 14px; padding-bottom: 14px; display: flex; flex
 .brand img { width: 28px; height: 28px; }
 header.site nav { display: flex; flex-wrap: wrap; gap: 4px 24px; flex: 1; justify-content: flex-end; font-size: 15px; }
 
-main.wrap { padding-top: 64px; padding-bottom: 80px; }
+main.wrap { padding-top: 24px; padding-bottom: 32px; }
 h1 { margin: 0; font-size: 32px; font-weight: 600; line-height: 1.25; }
 .lead { margin: 12px 0 0; max-width: 720px; font-size: 18px; color: var(--text-2); }
 .download { margin-top: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
@@ -161,9 +161,13 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <section>
 <h2>Other TeXpresso-based editors</h2>
 <ul>
-<li><a href="https://github.com/DominikPeters/texpresso-vscode">Visual Studio Code</a> — an extension using the same pinned TeXpresso engine as Espresso.</li>
-<li><a href="https://github.com/let-def/texpresso/tree/main/emacs">Emacs</a> — the original TeXpresso mode.</li>
-<li><a href="https://github.com/let-def/texpresso.vim">Neovim</a> — the texpresso.vim integration.</li>
+<li><a href="https://github.com/DominikPeters/texpresso-vscode">Visual Studio Code</a> — an extension using the same pinned TeXpresso engine as TeXstudio Espresso.</li>
+<li>Emacs — <a href="https://github.com/stefanoconiglio/emacs-texpresso-view">texpresso-view</a> embeds the preview inside Emacs; the <a href="https://github.com/let-def/texpresso/tree/main/emacs">original mode</a> uses a separate viewer.</li>
+<li>Neovim — <a href="https://github.com/let-def/texpresso.vim">texpresso.vim</a>, with <a href="https://github.com/merv1n34k/marksetta.nvim">marksetta.nvim</a> adding live preview for Marksetta documents.</li>
+<li><a href="https://github.com/gcanat/texpresso.vim9">Vim 9</a> — a Vim9script port of the Neovim integration.</li>
+<li>Zed — the <a href="https://zed.dev/extensions/texpresso">TeXpresso extension</a> and the newer <a href="https://github.com/Maymall/texpresso-zed">TeXpresso Live</a> development extension.</li>
+<li><a href="https://github.com/Banrs/Underleaf">TeXLocal / Underleaf</a> — a native macOS editor with experimental TeXpresso live preview.</li>
+<li><a href="https://github.com/max-prime-math/typr">Typr</a> — a browser editor with experimental TeXpresso preview through its optional <a href="https://github.com/max-prime-math/typr-server">companion service</a>.</li>
 </ul>
 </section>
 </div>

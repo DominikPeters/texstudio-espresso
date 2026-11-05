@@ -3,13 +3,13 @@
 ## Repository layout
 
 - `DominikPeters/texstudio-espresso` is the standalone product repository.
-  Its default branch, `main`, contains Espresso development, CI and releases.
+  Its default branch, `main`, contains TeXstudio Espresso development, CI and releases.
 - `DominikPeters/texstudio` remains a GitHub fork of `texstudio-org/texstudio`
   for preparing upstream contributions. Existing branches and pull-request
   references remain there.
 - `texstudio-org/texstudio` is the upstream TeXstudio project.
 
-The Espresso repository preserves the shared Git history. Keep an upstream
+The TeXstudio Espresso repository preserves the shared Git history. Keep an upstream
 remote and merge suitable upstream updates into `main`. The repository does not
 need GitHub's fork relationship to merge that history.
 
@@ -21,10 +21,10 @@ contributions  https://github.com/DominikPeters/texstudio.git
 upstream       https://github.com/texstudio-org/texstudio.git
 ```
 
-## Espresso changes
+## TeXstudio Espresso changes
 
 Create a focused branch from `origin/main`, then open a pull request targeting
-Espresso's `main`. File Espresso-specific issues in the product repository.
+TeXstudio Espresso's `main`. File issues specific to TeXstudio Espresso in the product repository.
 Follow [the background testing instructions](native/TESTING.md) and the local
 app/update rules in [AGENTS.md](AGENTS.md). Keep the pinned engine revision and
 its runtime bundle consistent; see [native/README.md](native/README.md).
@@ -33,11 +33,11 @@ its runtime bundle consistent; see [native/README.md](native/README.md).
 
 Prepare generic fixes on a clean branch based on `upstream/master`, push that
 branch to `contributions`, and open the pull request against
-`texstudio-org/texstudio`. Cherry-pick a self-contained Espresso fix onto that
+`texstudio-org/texstudio`. Cherry-pick a self-contained TeXstudio Espresso fix onto that
 branch when appropriate, and include its relevant tests and comparison evidence.
 This keeps upstream pull requests focused on the generic change.
 
-Use a separate checkout or Git worktree for upstream work when the Espresso
+Use a separate checkout or Git worktree for upstream work when the TeXstudio Espresso
 checkout has active builds. Follow upstream's own contribution instructions in
 that checkout. The existing `fix/pdf-toolbar-dpi-scaling` branch is an example
 of an upstream-focused contribution.

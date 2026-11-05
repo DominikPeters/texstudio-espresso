@@ -32,7 +32,7 @@ published, are available on the [releases page](https://github.com/DominikPeters
 
 ## Development and contributions
 
-`main` is the Espresso development branch in this standalone product repository.
+`main` is the TeXstudio Espresso development branch in this standalone product repository.
 The complete TeXstudio history is retained so upstream updates can be merged.
 [CONTRIBUTING.md](CONTRIBUTING.md) describes product contributions and the separate
 [upstream-contribution fork](https://github.com/DominikPeters/texstudio).
@@ -41,7 +41,7 @@ for architectural background.
 
 ## Upstream and licensing
 
-Espresso builds on TeXstudio's editor, PDF viewer and editing tools. The
+TeXstudio Espresso builds on TeXstudio's editor, PDF viewer and editing tools. The
 [upstream project](https://www.texstudio.org),
 [user manual](https://texstudio-org.github.io/getting_started.html), and
 [contribution guide](https://github.com/texstudio-org/texstudio/wiki/Contribute)
