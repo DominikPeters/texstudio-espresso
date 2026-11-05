@@ -1,0 +1,149 @@
+name: Build TeXstudio Espresso for Linux
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x86_64, aarch64]
+    runs-on: ${{ matrix.architecture == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install Qt, engine build dependencies and TeX Live
+        run: |
+          # The runner's Azure mirror can trickle large TeX downloads for tens
+          # of minutes. Use Ubuntu's canonical HTTPS archive for this job.
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          fi
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build build-essential pkg-config patchelf dpkg-dev \
+            qt6-base-dev qt6-5compat-dev libquazip1-qt6-dev qt6-tools-dev qt6-tools-dev-tools qt6-declarative-dev qt6-svg-dev \
+            libhunspell-dev libx11-dev libxkbcommon-x11-dev libpoppler-qt6-dev libpoppler-cpp-dev \
+            libsdl2-dev libmupdf-dev libmujs-dev libfreetype-dev libgumbo-dev \
+            libjbig2dec0-dev libjpeg-dev libopenjp2-7-dev libfontconfig-dev \
+            libharfbuzz-dev libgraphite2-dev libicu-dev libpng-dev \
+            libleptonica-dev libtesseract-dev texlive-xetex texlive-fonts-recommended texlive-bibtex-extra biber \
+            texlive-latex-extra texlive-pictures poppler-utils
+      - name: Read locked PNG compressor revision
+        id: compressor
+        run: python3 -c 'import json,os; open(os.environ["GITHUB_OUTPUT"], "a").write("revision=" + json.load(open("native/dependencies.lock.json"))["zlibNg"]["revision"] + "\n")'
+      - name: Fetch locked zlib-ng source
+        uses: actions/checkout@v4
+        with:
+          repository: zlib-ng/zlib-ng
+          ref: ${{ steps.compressor.outputs.revision }}
+          path: .native-sources/zlib-ng
+          persist-credentials: false
+      - name: Read locked renderer
+        id: renderer
+        run: python3 -c 'import json,os; open(os.environ["GITHUB_OUTPUT"], "a").write("revision=" + json.load(open("native/dependencies.lock.json"))["mupdf"]["revision"] + "\n")'
+      - uses: actions/checkout@v4
+        with:
+          repository: ArtifexSoftware/mupdf
+          ref: ${{ steps.renderer.outputs.revision }}
+          path: .native-sources/mupdf
+          persist-credentials: false
+      - name: Fetch locked LCMS2 renderer dependency
+        run: git -C .native-sources/mupdf submodule update --init --depth 1 thirdparty/lcms2
+      - name: Check native tooling and build bundled engine
+        id: engine
+        run: |
+          python3 -m unittest discover -s native/tests
+          python3 native/scripts/build_linux.py --mupdf-source .native-sources/mupdf --zlib-ng-source .native-sources/zlib-ng --jobs 2
+          python3 native/scripts/validate_bundle.py "native/.bundles/linux-$(uname -m)"
+      - name: Read available package providers
+        id: providers
+        run: python3 -c 'import json,os,platform; caps=json.load(open("native/.bundles/linux-"+platform.machine()+"/build-manifest.json"))["capabilities"]; open(os.environ["GITHUB_OUTPUT"],"a").write("miktex="+str("miktex" in caps.get("packageProviders",[])).lower()+"\n")'
+      - name: Verify TikZ annotations preserve ordinary-build pixels
+        run: python3 native/texpresso/test/test-tikz-figures.py "native/.bundles/linux-$(uname -m)/bin/texpresso"
+      - name: Verify checkpoint and supervisor cleanup after abrupt shutdown
+        run: |
+          make -C native/texpresso test-parent-watch test-sprotocol
+          python3 native/texpresso/test/test-checkpoint-cleanup.py "native/.bundles/linux-$(uname -m)/bin/texpresso"
+      - name: Build Qt integration clients
+        id: qt-build
+        run: |
+          cmake -S src/texpresso -B build-client -G Ninja
+          cmake --build build-client -j2
+      - name: Test Qt client against bundled engine
+        id: qt-tests
+        env:
+          TEXPRESSO_TEST_TRACE_PROTOCOL: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          TEXPRESSO_TEST_ENGINE="$PWD/native/.bundles/linux-$(uname -m)/bin/texpresso" \
+            ctest --test-dir build-client --output-on-failure
+      - name: Exercise sustained source following on natural 30/100-page documents
+        env:
+          QT_QPA_PLATFORM: offscreen
+          TEXPRESSO_TEST_SUSTAINED: "1"
+          TEXPRESSO_SUSTAINED_ARTIFACTS: ${{ github.workspace }}/build-client/sustained-results
+        run: |
+          TEXPRESSO_TEST_ENGINE="$PWD/native/.bundles/linux-$(uname -m)/bin/texpresso" \
+            ctest --test-dir build-client -R '^texpresso-sustained$' --output-on-failure
+      - name: Build and install application with engine runtime
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/texstudio-espresso
+          cmake --build build -j2
+          DESTDIR="$PWD/build/package" cmake --install build
+          test -x build/package/opt/texstudio-espresso/libexec/texstudio/texpresso/bin/texpresso
+          test -x build/package/opt/texstudio-espresso/libexec/texstudio/texpresso/bin/texpresso-xetex
+          build/package/opt/texstudio-espresso/libexec/texstudio/texpresso/bin/texpresso -capabilities
+      - name: Collect exact source packages and distribution notices
+        run: |
+          python3 native/scripts/portable_inventory.py --platform linux \
+            --root build/package --engine "native/.bundles/linux-$(uname -m)" \
+            --output build/package/opt/texstudio-espresso/share/texstudio/licenses
+          python3 native/scripts/source_release.py --plan build/source-plan \
+            --inventory build/package/opt/texstudio-espresso/share/texstudio/licenses/inventory.json --build-dir build
+          version=$(python3 native/scripts/product_release.py --field version)
+          python3 native/scripts/source_release.py --assemble build/source-plan \
+            --cache .native-sources/distribution-sources --fetch --dependencies dist/dependency-sources \
+            --output "dist/texstudio-espresso-${version}-linux-$(uname -m)-sources.zip"
+      - name: Package and verify the native Linux application
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          version=$(python3 native/scripts/product_release.py --field version)
+          python3 native/scripts/package_linux.py --root build/package \
+            --output "dist/texstudio-espresso-${version}-linux-$(uname -m).deb"
+          sudo dpkg -i "dist/texstudio-espresso-${version}-linux-$(uname -m).deb"
+          profile=$(mktemp -d)
+          texstudio-espresso --config "$profile" --version
+          rm -rf "$profile"
+          dpkg -s texstudio-espresso
+      - name: Upload package and matching project sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: texstudio-espresso-linux-${{ matrix.architecture }}-release
+          path: |
+            dist/*.deb*
+            dist/*-sources.zip*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload reusable dependency sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: texstudio-espresso-linux-${{ matrix.architecture }}-dependency-sources
+          path: dist/dependency-sources/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save release diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texstudio-espresso-linux-${{ matrix.architecture }}-diagnostics
+          path: |
+            build-client/Testing/Temporary/
+            build/package/opt/texstudio-espresso/share/texstudio/licenses/inventory.json
+            build/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore

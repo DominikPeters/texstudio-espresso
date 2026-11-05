@@ -4,15 +4,20 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Prepare release ZIP, notices and matching dependency sources
+        type: boolean
+        default: true
 permissions:
   contents: read
 concurrency:
-  group: windows-wsl-${{ github.ref }}
-  cancel-in-progress: true
+  group: windows-wsl-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
   engine:
     runs-on: ubuntu-22.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,6 +27,12 @@ jobs:
           python-version: '3.12'
       - name: Install Linux build dependencies
         run: |
+          if [ -f /etc/apt/sources.list ]; then
+            sudo sed -i 's/^# deb-src /deb-src /' /etc/apt/sources.list
+          fi
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build build-essential pkg-config patchelf \
@@ -55,6 +66,24 @@ jobs:
           python3 native/scripts/build_linux.py --mupdf-source .native-sources/mupdf --zlib-ng-source .native-sources/zlib-ng --jobs 2
           python3 native/scripts/validate_bundle.py native/.bundles/linux-x86_64 --windows-wsl
           tar -C native/.bundles/linux-x86_64 -czf engine-linux-x86_64.tar.gz .
+      - name: Collect WSL engine dependency source evidence
+        if: github.event_name == 'workflow_dispatch' && inputs.release
+        run: |
+          python3 native/scripts/portable_inventory.py --platform linux \
+            --root native/.bundles/linux-x86_64 --engine native/.bundles/linux-x86_64 \
+            --output engine-license-evidence
+          python3 native/scripts/source_release.py --plan engine-source-plan --inventory engine-license-evidence/inventory.json
+          python3 native/scripts/source_release.py --assemble engine-source-plan \
+            --cache .native-sources/distribution-sources --fetch --dependencies engine-dependency-sources \
+            --output engine-project-sources.zip
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'workflow_dispatch' && inputs.release
+        with:
+          name: windows-wsl-engine-source-evidence
+          path: |
+            engine-license-evidence/
+            engine-dependency-sources/
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: windows-wsl-linux-engine
@@ -63,7 +92,7 @@ jobs:
   windows:
     needs: engine
     runs-on: windows-2025
-    timeout-minutes: 60
+    timeout-minutes: 100
     steps:
       - name: Preserve pinned Linux source bytes on Windows
         run: git config --global core.autocrlf false
@@ -73,6 +102,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: windows-wsl-linux-engine
+      - uses: actions/download-artifact@v7
+        if: github.event_name == 'workflow_dispatch' && inputs.release
+        with:
+          name: windows-wsl-engine-source-evidence
+          path: engine-source-inputs
       - name: Install WSL Ubuntu for CI (application accepts any distribution)
         shell: pwsh
         run: |
@@ -164,6 +198,41 @@ jobs:
           if ($app.ExitCode -ne 0) { throw "Portable app exited with $($app.ExitCode)" }
           $runner = Start-Process -FilePath "$env:GITHUB_WORKSPACE\dist\TeXstudio-Espresso\texstudio-wsl.exe" -ArgumentList '--help' -Wait -PassThru -NoNewWindow
           if ($runner.ExitCode -ne 0) { throw "Portable build command adapter exited with $($runner.ExitCode)" }
+      - name: Collect Windows notices and complete matching sources
+        if: github.event_name == 'workflow_dispatch' && inputs.release
+        shell: msys2 {0}
+        run: |
+          python native/scripts/portable_inventory.py --platform windows \
+            --root dist/TeXstudio-Espresso --engine build-windows/texpresso-runtime \
+            --engine-evidence engine-source-inputs/engine-license-evidence \
+            --output dist/TeXstudio-Espresso/licenses --fetch
+          python native/scripts/source_release.py --plan build-windows/source-plan \
+            --inventory dist/TeXstudio-Espresso/licenses/inventory.json --build-dir build-windows
+          mkdir -p dist/dependency-sources
+          cp engine-source-inputs/engine-dependency-sources/* dist/dependency-sources/
+          version=$(python native/scripts/product_release.py --field version)
+          python native/scripts/source_release.py --assemble build-windows/source-plan \
+            --cache .native-sources/distribution-sources --fetch \
+            --dependencies dist/dependency-sources \
+            --output "dist/texstudio-espresso-${version}-windows-x86_64-sources.zip"
+          cp native/WINDOWS.md dist/TeXstudio-Espresso/SETUP.md
+          cd dist
+          zip -qr "texstudio-espresso-${version}-windows-x86_64.zip" TeXstudio-Espresso
+          sha256sum "texstudio-espresso-${version}-windows-x86_64.zip" > "texstudio-espresso-${version}-windows-x86_64.zip.sha256"
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'workflow_dispatch' && inputs.release
+        with:
+          name: texstudio-espresso-windows-x86_64-release
+          path: dist/*.zip*
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'workflow_dispatch' && inputs.release
+        with:
+          name: texstudio-espresso-windows-x86_64-dependency-sources
+          path: dist/dependency-sources/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: TeXstudio-Espresso-Windows-WSL-development

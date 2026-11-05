@@ -96,8 +96,11 @@ def plan(inventory, destination, evidence_directory=None, build_directory=None):
                 records.append(archive_record(key + f'-recipe-input-{index}', url,
                                               [{'algorithm': 'SHA256', 'checksumValue': digest}]))
     lock = json.loads((ROOT / 'native/dependencies.lock.json').read_text())
-    for name, item in json.loads((ROOT / 'native/macos-dependencies.lock.json').read_text()).items():
+    platform_sources = json.loads((ROOT / 'native/macos-dependencies.lock.json').read_text()) if inventory.get('platform', 'darwin') == 'darwin' else {}
+    for name, item in platform_sources.items():
         records.append(archive_record(name, item['url'], [{'algorithm': 'SHA256', 'checksumValue': item['sha256']}]))
+    for item in inventory.get('additionalSources', []):
+        records.append(archive_record(item['name'], item['url'], [{'algorithm': 'SHA256', 'checksumValue': item['sha256']}]))
     records.append(archive_record('icu-private-data-source', lock['icu']['sourceUrl'],
                                   [{'algorithm': 'SHA256', 'checksumValue': lock['icu']['sourceSha256']}]))
     # Git snapshots are pinned by immutable commits, not mutable branch names.
@@ -212,7 +215,7 @@ def source_filename(file, digest):
     """Content-based names let versions and architectures share exact sources."""
     with file.open('rb') as stream:
         magic = stream.read(6)
-    suffix = '.tar.gz' if magic.startswith(b'\x1f\x8b') else '.tar.xz' if magic.startswith(b'\xfd7zXZ') else '.tar.bz2' if magic.startswith(b'BZh') else '.zip' if magic.startswith(b'PK\x03\x04') else '.source'
+    suffix = '.tar.gz' if magic.startswith(b'\x1f\x8b') else '.tar.xz' if magic.startswith(b'\xfd7zXZ') else '.tar.bz2' if magic.startswith(b'BZh') else '.tar.zst' if magic.startswith(b'\x28\xb5\x2f\xfd') else '.zip' if magic.startswith(b'PK\x03\x04') else '.source'
     return digest + suffix
 
 
