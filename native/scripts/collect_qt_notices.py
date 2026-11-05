@@ -7,7 +7,7 @@ from pathlib import Path, PurePosixPath
 import posixpath
 import re
 import tarfile
-import urllib.request
+from source_release import fetch_record
 
 
 def collect(archive, destination):
@@ -69,18 +69,7 @@ def main():
             continue
         url = package['source']
         expected = next(x['checksumValue'] for x in package['sourceChecksums'] if x['algorithm'] == 'SHA256')
-        archive = args.cache / url.rsplit('/', 1)[-1]
-        if not archive.exists():
-            if not args.fetch:
-                parser.error(f'Missing cached source archive: {archive}; use --fetch')
-            temporary = archive.with_suffix('.partial')
-            urllib.request.urlretrieve(url, temporary)
-            if hashlib.file_digest(temporary.open('rb'), 'sha256').hexdigest() != expected:
-                temporary.unlink()
-                raise ValueError(f'Source checksum mismatch: {url}')
-            temporary.rename(archive)
-        if hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest() != expected:
-            raise ValueError(f'Cached source checksum mismatch: {archive}')
+        archive = fetch_record({'name': key, 'url': url, 'sha256': expected}, args.cache, args.fetch)
         files, count = collect(archive, args.output / key)
         manifest.append({'package': key, 'url': url, 'sha256': expected, 'files': files,
                          'attributions': count,

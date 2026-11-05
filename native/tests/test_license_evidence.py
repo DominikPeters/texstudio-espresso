@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import tarfile
 import subprocess
 import unittest
 from unittest.mock import patch
@@ -33,6 +34,28 @@ class LicenseEvidence(unittest.TestCase):
                         self.assertIn(file.relative_to(root).as_posix(), tracked,
                                       'Declared notice must survive git archive / a clean CI checkout')
                         self.assertEqual(license_evidence.sha256(file), entry['sha256'])
+
+    def test_qt_collector_reuses_the_source_release_cache_without_fetching(self):
+        import collect_qt_notices
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); cache = root / 'cache'; cache.mkdir()
+            archive = cache / 'prefetched-source'
+            with tarfile.open(archive, 'w:gz') as tar:
+                data = b'original Qt license attribution'
+                member = tarfile.TarInfo('qtbase-source/LICENSE'); member.size = len(data)
+                tar.addfile(member, io.BytesIO(data))
+            digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+            archive.rename(cache / ('qtbase-1.2-' + digest[:12]))
+            inventory = root / 'inventory.json'
+            inventory.write_text(json.dumps({'packages': {'qtbase-1.2': {
+                'source': 'https://example.org/qtbase-1.2.tar.gz',
+                'sourceChecksums': [{'algorithm': 'SHA256', 'checksumValue': digest}]}}}))
+            argv = ['collect_qt_notices.py', '--inventory', str(inventory), '--cache', str(cache), '--output', str(root / 'notices')]
+            with patch.object(sys, 'argv', argv):
+                collect_qt_notices.main()
+            self.assertEqual((root / 'notices/qtbase-1.2/LICENSE').read_bytes(), b'original Qt license attribution')
+            record = json.loads((root / 'notices/manifest.json').read_text())[0]
+            self.assertEqual(record['sha256'], digest)
 
     def test_qt_rebuild_reuses_notices_only_for_identical_upstream_source(self):
         with tempfile.TemporaryDirectory() as temp:
