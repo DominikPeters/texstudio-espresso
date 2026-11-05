@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - uses: actions/setup-python@v5
@@ -61,7 +61,7 @@ jobs:
       - name: Read locked compressor
         id: compressor
         run: python3 -c 'import json,os; open(os.environ["GITHUB_OUTPUT"], "a").write("revision=" + json.load(open("native/dependencies.lock.json"))["zlibNg"]["revision"] + "\n")'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: zlib-ng/zlib-ng
           ref: ${{ steps.compressor.outputs.revision }}
@@ -70,7 +70,7 @@ jobs:
       - name: Read locked renderer
         id: renderer
         run: python3 -c 'import json,os; open(os.environ["GITHUB_OUTPUT"], "a").write("revision=" + json.load(open("native/dependencies.lock.json"))["mupdf"]["revision"] + "\n")'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ArtifexSoftware/mupdf
           ref: ${{ steps.renderer.outputs.revision }}
@@ -114,7 +114,7 @@ jobs:
     steps:
       - name: Preserve pinned Linux source bytes on Windows
         run: git config --global core.autocrlf false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - uses: actions/download-artifact@v4
