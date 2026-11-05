@@ -223,8 +223,11 @@ void LinksUiTest::realContinuousSecondaryPage()
     auto slider = widget.findChild<QSlider *>(); QVERIFY(slider); slider->setValue(-100);
     QPointer<TexpressoCanvas> secondary;
     const auto findSecondary = [&] {
+        // A resize can invalidate the controller cache before the coalesced
+        // canvas refresh. Wait for clickable annotations at the current width.
         for (auto item : widget.findChildren<TexpressoCanvas *>("texpressoNeighborPage"))
-            if (item->isVisible() && item->fresh && item->property("texpressoPage").toInt() == 1) { secondary = item; return true; }
+            if (item->isVisible() && item->fresh && item->property("texpressoPage").toInt() == 1
+                && session->preview.pageValid(1) && item->annotations == session->preview.annotationsForPage(1)) { secondary = item; return true; }
         return false;
     };
     QTRY_VERIFY_WITH_TIMEOUT(findSecondary(), 20000);
@@ -270,6 +273,8 @@ void LinksUiTest::realContinuousSecondaryPage()
     QTest::mouseClick(secondary, Qt::LeftButton, Qt::NoModifier,
         ((internalCenter - secondary->pageBounds.topLeft()) * secondary->scale).toPoint());
     QCOMPARE(internalClicks.size(), 1);
+    QCOMPARE(internalClicks.last()[1].toInt(), internal);
+    QCOMPARE(openedUrls.size(), 1);
     QTRY_VERIFY2_WITH_TIMEOUT(session->preview.page() == 0 && session->preview.valid() && geometryReadyAtReveal,
         qPrintable(QString("page=%1 valid=%2 geometryReady=%3 canvas=%4,%5,%6,%7 bounds=%8,%9,%10,%11\n%12")
             .arg(session->preview.page()).arg(session->preview.valid()).arg(geometryReadyAtReveal)

@@ -5,6 +5,20 @@ bundled Linux TeXpresso engine through a persistent `wsl.exe` pipe. WSLg and a
 network listener are not needed. Windows TeX installations do not supply packages
 to the Linux compiler: install TeX Live or MiKTeX inside the selected distribution.
 
+## Runtime requirements
+
+The native x64 editor uses Qt 6.12, whose documented minimum is
+[Windows 10 version 1809](https://doc.qt.io/qt-6/windows.html).
+Live preview additionally requires WSL2: Microsoft documents its x64 minimum as
+[Windows 10 version 1903, build 18362.1049](https://learn.microsoft.com/windows/wsl/install-manual#step-2---check-requirements-for-running-wsl-2),
+or Windows 11. The convenient `wsl --install` setup requires
+[version 2004, build 19041](https://learn.microsoft.com/windows/wsl/install)
+or newer; earlier compatible systems need Microsoft's manual WSL2 setup.
+These are dependency requirements, not a Windows-version whitelist in the app.
+CI exercises Windows Server 2025 and Ubuntu 24.04 in WSL2; it does not establish
+that every older Windows build works. Each release records the bundled engine's
+actual glibc requirement in `runtime-requirements.json`.
+
 ## Setup and builds
 
 Open **TeX Environment…** in the live-preview toolbar. Use the default WSL
