@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TeXstudio Espresso</title>
 <meta name="description" content="A fork of the TeXstudio LaTeX editor with a live preview based on TeXpresso.">
+<link rel="canonical" href="https://pref.tools/texstudio-espresso/">
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
 :root {
@@ -88,7 +89,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <a href="#features">Features</a>
 <a href="#requirements">Requirements</a>
 <a href="#install">Installation</a>
-<a href="https://github.com/DominikPeters/texstudio">Source</a>
+<a href="https://github.com/DominikPeters/texstudio-espresso">Source</a>
 </nav>
 </div>
 </header>
@@ -98,8 +99,8 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <p class="lead">A fork of the TeXstudio LaTeX editor with a live preview. The preview is produced by TeXpresso and updates while you edit, without running a separate compile.</p>
 
 <div id="download" class="download">
-<a class="button" href="https://github.com/DominikPeters/texstudio/releases/latest">Download for macOS</a>
-<span class="meta">Version [VERSION], [DATE] · <a href="https://github.com/DominikPeters/texstudio/releases">Release notes</a> · <a href="https://github.com/DominikPeters/texstudio/releases">Linux and earlier versions</a></span>
+<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso-release.yml">macOS test builds</a>
+<span class="meta">In development · <a href="https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso-windows.yml">Windows test builds</a> · <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/README.md">Build from source</a></span>
 </div>
 
 <figure class="shot">
@@ -136,31 +137,31 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <section id="requirements">
 <h2>Requirements</h2>
 <ul>
-<li>A TeX Live installation (on macOS, for example MacTeX), which provides the packages.</li>
+<li>A TeX Live installation (on macOS, for example MacTeX) or MiKTeX, which provides the packages.</li>
 <li>The TeXpresso engine is bundled; nothing else to install.</li>
-<li>macOS [MINIMUM VERSION] or Linux ([DISTRIBUTION BASELINE]).</li>
+<li>macOS or Linux. On Windows, live compilation runs inside WSL2; see the <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/WINDOWS.md">setup guide</a>.</li>
 </ul>
 </section>
 
 <section id="install">
 <h2>Installation</h2>
 <ol>
-<li>Install TeX Live if you do not have it.</li>
-<li>Download the app from the <a href="https://github.com/DominikPeters/texstudio/releases/latest">latest release</a> and move it to Applications.</li>
+<li>Install TeX Live or MiKTeX if you do not have it. On Windows, install it inside WSL2.</li>
+<li>Download a test build from a successful GitHub Actions run (a GitHub account is required). On macOS, extract the app and move it to Applications. Public releases will be listed on the <a href="https://github.com/DominikPeters/texstudio-espresso/releases">releases page</a>.</li>
 <li>Open a saved <code>.tex</code> file. The preview appears next to the editor.</li>
 </ol>
-<p>To build from source, see the <a href="https://github.com/DominikPeters/texstudio/blob/texpresso/native/README.md">build instructions</a>.</p>
+<p>To build from source, see the <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/README.md">build instructions</a>.</p>
 </section>
 
 <section>
 <h2>Source and license</h2>
-<p>Free software under the GNU GPL, version 3. Source code, build instructions and issue tracker are on <a href="https://github.com/DominikPeters/texstudio">GitHub</a>. Based on <a href="https://www.texstudio.org">TeXstudio</a> and on <a href="https://github.com/let-def/texpresso">TeXpresso</a> by Frédéric Bour. The preview uses the same pinned TeXpresso version as <a href="https://github.com/DominikPeters/texpresso-vscode">texpresso-vscode</a>.</p>
+<p>Free software under the GNU GPL, version 3. Source code, build instructions and issue tracker are on <a href="https://github.com/DominikPeters/texstudio-espresso">GitHub</a>. Based on <a href="https://www.texstudio.org">TeXstudio</a> and on <a href="https://github.com/let-def/texpresso">TeXpresso</a> by Frédéric Bour. The preview uses the same pinned TeXpresso version as <a href="https://github.com/DominikPeters/texpresso-vscode">texpresso-vscode</a>.</p>
 </section>
 </div>
 </main>
 
 <footer class="site">
-<div class="wrap">TeXstudio Espresso is an independent fork and is not maintained by the TeXstudio developers. · <a href="https://github.com/DominikPeters/texstudio/issues">Report an issue</a></div>
+<div class="wrap">TeXstudio Espresso is an independent fork and is not maintained by the TeXstudio developers. · <a href="https://github.com/DominikPeters/texstudio-espresso/issues">Report an issue</a></div>
 </footer>
 
 </body>

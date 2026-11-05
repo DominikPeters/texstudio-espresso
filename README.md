@@ -10,6 +10,8 @@ The engine is bundled with the application and uses your TeX installation for
 packages. Each project retains its own session and preview position when
 switching tabs. Normal TeXstudio build commands remain available for final PDFs.
 
+[Website](https://pref.tools/texstudio-espresso/) · [Website deployment](site/README.md)
+
 Open a saved `.tex` project to start. The preview includes continuous scrolling,
 page navigation, zoom and magnification, source synchronization, hyperlinks,
 Pause/Resume, Stop, Restart and Output controls. Command-click on macOS
