@@ -119,7 +119,9 @@ void PaginationTest::failedFrontierStopsAndRepairs()
     QVERIFY(preview.paginationStopped()); QVERIFY(!preview.complete());
     for (int i = 0; i < 20; ++i) { preview.navigateTo(1000); preview.setViewportPages({0, 1}, true); }
     QCOMPARE(preview.page(), 0);
-    QTest::qWait(200); QVERIFY(!preview.busy());
+    // Gesture settling is timer-driven; runner scheduling need not deliver
+    // the 150 ms timeout within one fixed 200 ms sleep.
+    QTRY_VERIFY_WITH_TIMEOUT(!preview.busy(), 2000);
     preview.sourceChanged(1);
     QVERIFY(!preview.paginationStopped()); QVERIFY(preview.canDiscoverPages());
     preview.message({"preview-state", 2, 1, 2, true, 0});
