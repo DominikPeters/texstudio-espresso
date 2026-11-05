@@ -4,12 +4,11 @@ import argparse
 import json
 from pathlib import Path
 import shutil
-import tempfile
 import zipfile
 
 from common import sha256, run
 from product_release import version
-from source_bundle import bundle_sources
+from source_links import source_information
 
 
 TARGETS = {'macos-arm64': 'dmg', 'macos-x86_64': 'dmg',
@@ -41,33 +40,7 @@ def assemble(inputs, output, revision, packaging_revision=None):
             if manifest['engineRevision'] != expected_engine:
                 raise ValueError('Engine source differs from release gitlink: ' + name)
         sources[target] = {'file': candidates[0], 'manifest': manifest}
-    dependency_records = {}
-    for index in inputs.rglob('index.json'):
-        records = json.loads(index.read_text())
-        if not isinstance(records, list): continue
-        for record in records:
-            name = record.get('sourceFile')
-            if not name or Path(name).name != name: raise ValueError('Unsafe dependency filename')
-            file = index.parent / name
-            if sha256(file) != record['sha256']: raise ValueError('Dependency source checksum mismatch: ' + name)
-            dependency_records[name] = record
-            record['_file'] = file
-    for source in sources.values():
-        for entry in source['manifest']['inputs']:
-            if entry['sourceFile'] not in dependency_records:
-                raise ValueError('Required dependency source missing from release: ' + entry['name'])
-            if dependency_records[entry['sourceFile']]['sha256'] != entry['sha256']:
-                raise ValueError('Required dependency source has a different hash')
-    # Keep the dependency cache internal; publish only one complete source archive.
-    source_name = 'texstudio-espresso-' + tag + '-sources.zip'
-    with tempfile.TemporaryDirectory(dir=output.parent) as folder:
-        folder = Path(folder)
-        for name, record in dependency_records.items():
-            # Hard links avoid copying gigabytes of already verified inputs.
-            (folder / name).hardlink_to(record['_file'])
-        source_report = bundle_sources({target: item['file'] for target, item in sources.items()},
-                                       folder, output / source_name, revision, expected_engine, tag,
-                                       packaging_revision)
+    source_info = source_information(sources, output, revision, expected_engine, packaging_revision)
     base = 'https://github.com/DominikPeters/texstudio-espresso/releases/download/' + tag + '/'
     requirements = {}
     for target in TARGETS:
@@ -94,7 +67,8 @@ def assemble(inputs, output, revision, packaging_revision=None):
                 requirements[target] = json.loads(archive.read(names[0]))
     (output / 'runtime-requirements.json').write_text(json.dumps(requirements, indent=2) + '\n')
     report = {'version': tag, 'sourceRevision': revision, 'binaries': binaries,
-              'sources': source_name, 'dependencySourceCount': source_report['dependencySourceCount'],
+              'sourceInformation': 'source-info.zip', 'sourceManifest': 'source-manifest.json',
+              'dependencySourceCount': len(source_info['dependencies']),
               **({'packagingRevision': packaging_revision} if packaging_revision else {})}
     (output / 'release-manifest.json').write_text(json.dumps(report, indent=2) + '\n')
     files = sorted(p for p in output.iterdir() if p.is_file())
@@ -109,10 +83,11 @@ def assemble(inputs, output, revision, packaging_revision=None):
         'The Linux packages declare their exact system-library dependencies and install alongside upstream TeXstudio.', '',
         'See [runtime requirements](' + base + 'runtime-requirements.json) for requirements derived from the shipped stack.', '',
         '## Licenses and corresponding source', '',
-        '[Download the complete source archive](' + base + source_name + '). '
-        'It includes the shared editor and pinned engine once, all dependency sources, licenses, '
-        'patches and platform-specific build recipes. No additional source download is needed. '
-        'See its README for offline restoration instructions.', '',
+        '[Editor source](' + source_info['editor']['url'] + ') · '
+        '[TeXpresso engine source](' + source_info['engine']['url'] + ') · '
+        '[Dependency source links and versions](' + base + 'source-manifest.json) · '
+        '[Build recipes and patches](' + base + 'source-info.zip). '
+        'Clone the project recursively to obtain the pinned engine; the GitHub automatic source archives do not include submodules.', '',
         'Original component licenses apply, including GPL, AGPL, LGPL and permissive licenses. '
         'This is an independent fork maintained by Dominik Peters.', '',
         'Source commit: `' + revision + '`. File integrity checks: [SHA256SUMS](' + base + 'SHA256SUMS).', '']

@@ -83,12 +83,11 @@ per-payload dictionary provenance, and artwork/template notices. Public binary
 distributions must provide clear access to matching project and dependency
 sources from the binary download page. `*-sources.zip` contains the editor,
 recursive engine source, dependency manifest, patches, notices and build recipes.
-`dependency-sources/` is an internal reusable build cache. The product release
-assembler consolidates all platform project ZIPs and required dependencies into
-one complete `texstudio-espresso-<version>-sources.zip`; shared inputs appear
-only once. No separate source downloads are required. CI still uploads the
-per-platform source ZIP and dependency cache as intermediate artifacts. These
-must not be flattened into hundreds of public release assets. The combined ZIP
-provides offline restoration for each platform and retains the original hashes,
-patches, notices and build recipes. See [release publication](RELEASING.md) and
+`dependency-sources/` is an internal verified build cache. Public releases link
+to exact project/engine/dependency sources instead of uploading that cache.
+`source-info.zip` preserves the small build recipes, patches and
+configuration, and `source-manifest.json` records the original URLs and hashes.
+CI project-source ZIPs remain internal evidence; their large dependency payloads
+must not be flattened into release assets or bundled into a giant public ZIP.
+See [release publication](RELEASING.md) and
 [licensing and source preparation](../docs/distribution-licensing.md).

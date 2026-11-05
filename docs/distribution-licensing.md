@@ -8,16 +8,19 @@ records 96 Mach-O images, 34 dependency packages and all 96 dictionary/thesaurus
 archives. This inventories the tested arm64 macOS package. Intel CI is prepared
 but was not run for this work; Linux needs its own actual dependency inventory.
 
-The public release provides one complete
-`texstudio-espresso-<version>-sources.zip` alongside its binaries. It contains
-all project/dependency sources, exact platform manifests, patches and build
-recipes; common inputs are stored once. The per-platform project ZIPs and
-reusable dependency cache remain internal preparation artifacts. GitHub's
-automatic source archives omit submodule contents and do not replace this bundle.
-Access to the matching source versions is retained while binaries are offered.
-See [the release workflow](../native/RELEASING.md) for current publication and
-packaging-only replacement instructions. Release-channel terms need separate
-review if an app store is considered.
+Public releases use source links: exact editor/engine commits, exact dependency
+URLs and hashes in `source-manifest.json`, and a small `source-info.zip` containing
+applied patches, build recipes and configuration. Large source caches
+are internal build evidence, not public release assets. GitHub also provides
+standard project source archives; a recursive Git clone obtains the engine.
+
+GNU's [source-on-another-server guidance](https://www.gnu.org/licenses/gpl-faq.en.html#SourceAndBinaryOnDifferentSites)
+permits this arrangement with clear directions and continued availability of
+matching source. Linking only a project homepage or a moving latest version is
+insufficient. Keep the pinned references accessible while offering the binaries;
+repair or mirror an exact input if its upstream URL disappears. This is separate
+from any component-specific notice, modification or relinking requirements.
+See [the release workflow](../native/RELEASING.md) for publication instructions.
 
 ## Evidence and licensing basis
 
@@ -143,15 +146,11 @@ patches, editor compiler flags/CMake cache and the app's complete notice evidenc
 Source notices can be regenerated from verified inputs using
 `collect_qt_notices.py` and `collect_library_notices.py`, as in the workflow.
 
-Restore a public release's editor, engine and native build inputs offline with
-Python 3.12+ and Git:
-
-```sh
-python3 texstudio-espresso-4.9.9-espresso-1-sources.zip --platform macos-arm64 --output ./source
-```
-
-This public ZIP includes the internal per-platform metadata and all exact
-upstream inputs; no dependency-source download or `--fetch` is necessary.
+For a public release, start with its exact editor and engine source links and
+build instructions in `native/`. The release's `source-manifest.json` identifies
+the exact upstream dependencies; `source-info.zip` includes the applied patches,
+original build recipes and configuration. The commands above are internal source
+preparation/evidence commands, not a required multi-gigabyte public download.
 
 Only MuPDF/LCMS2/zlib-ng snapshots are needed by this restore step. Missing files
 fail before extraction; add `--fetch` to explicitly retrieve those snapshots from

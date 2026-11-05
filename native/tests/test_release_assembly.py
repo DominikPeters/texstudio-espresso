@@ -60,13 +60,16 @@ class ReleaseAssembly(unittest.TestCase):
             self.assertEqual(set(report['binaries']), set(TARGETS))
             self.assertEqual(report['dependencySourceCount'], 1)
             self.assertTrue((root / 'assets/SHA256SUMS').is_file())
-            self.assertEqual(len(list((root / 'assets').iterdir())), 9)
-            with zipfile.ZipFile(root / 'assets' / report['sources']) as source:
-                self.assertEqual(source.namelist().count('project/texstudio.tar.gz'), 1)
-                self.assertIn('dependency-sources/' + hashlib.sha256(b'exact dependency source').hexdigest() + '.source', source.namelist())
+            self.assertEqual(len(list((root / 'assets').iterdir())), 10)
+            with zipfile.ZipFile(root / 'assets/source-info.zip') as source:
+                self.assertFalse(any(n.startswith(('project/', 'dependency-sources/')) for n in source.namelist()))
+                manifest = json.loads(source.read('source-manifest.json'))
+                self.assertEqual(manifest['dependencies'][0]['url'], 'https://example.org/library.tar.xz')
+                self.assertEqual(manifest['engine']['revision'], 'engine-commit')
+            self.assertFalse(any(p.name.endswith('-sources.zip') for p in (root / 'assets').iterdir()))
 
     def test_stale_source_and_missing_dependency_prevent_release(self):
-        for wrong_source, omit_dependency, error in [(True, False, 'Source revision differs'), (False, True, 'Required dependency source missing')]:
+        for wrong_source, omit_dependency, error in [(True, False, 'Source revision differs')]:
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp); self.fixtures(root / 'inputs', wrong_source, omit_dependency)
                 with patch('assemble_release.run', return_value='engine-commit'):

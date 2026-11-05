@@ -5,7 +5,7 @@
 requires every listed input; --fetch explicitly allows HTTPS downloads. There
 is no successful mode that silently omits required source inputs. Dependency
 archives are checksum-named files beside the internal project ZIP. The product
-release assembler publishes one complete source_bundle ZIP instead.
+release assembler publishes source links and small build metadata instead.
 """
 import argparse
 import hashlib
