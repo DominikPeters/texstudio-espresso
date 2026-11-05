@@ -4,12 +4,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source, package_notices, collect
+from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source, package_notices, collect, source_notices
 import subprocess
 import tempfile
 import hashlib
 import json
 import zipfile
+import tarfile
+import io
 from types import SimpleNamespace
 
 
@@ -117,3 +119,23 @@ class PortableInventory(unittest.TestCase):
             self.assertEqual(data['dictionaries'], [record])
             self.assertEqual((root / 'output/dictionaries/NOTICE').read_text(), 'dictionary attribution')
             self.assertTrue((root / 'output/index.html').is_file())
+
+    def test_original_notices_from_nested_exact_msys_source_archive(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); upstream = io.BytesIO()
+            with tarfile.open(fileobj=upstream, mode='w:gz') as archive:
+                data = b'original LGPL terms and copyright'
+                member = tarfile.TarInfo('libexample-1.0/COPYINGv3'); member.size = len(data)
+                archive.addfile(member, io.BytesIO(data))
+            file = root / 'example.src.tar.gz'
+            with tarfile.open(file, 'w:gz') as archive:
+                data = upstream.getvalue()
+                member = tarfile.TarInfo('example/upstream.tar.gz'); member.size = len(data)
+                archive.addfile(member, io.BytesIO(data))
+            record = {'name': 'example', 'records': [{'name': 'example', 'url': 'https://example.org/example.src.tar.gz',
+                       'sha256': hashlib.sha256(file.read_bytes()).hexdigest()}]}
+            with patch('portable_inventory.run', return_value='example /ucrt64/bin/libexample.dll\n'):
+                result = package_notices('example', root / 'notices', 'windows', record, root)
+            self.assertEqual(len(result), 1)
+            self.assertEqual(Path(result[0]).read_bytes(), b'original LGPL terms and copyright')
+            self.assertEqual(list(root.glob('source-notices-*')), [])

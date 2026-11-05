@@ -140,7 +140,50 @@ def msys_source(package, cache, fetch):
         {'name': base + '-' + release, 'url': url, 'sha256': sha256(file)}]}
 
 
-def package_notices(package, output, platform):
+def source_notices(source_record, cache, output):
+    """Recover original notices omitted from a binary package's file list.
+
+    The exact MSYS2 source archive was already downloaded and SHA256-bound to
+    its installed BASE/VERSION. Source packages can contain upstream tarballs.
+    Read selected members to stdout; never extract arbitrary archive paths or
+    execute their build recipes.
+    """
+    archive = source_release.fetch_record(source_record['records'][0], cache, False)
+    tool = shutil.which('bsdtar')
+    if not tool:
+        if sys.platform == 'win32': raise ValueError('Source notice collection requires MSYS2 libarchive/bsdtar')
+        tool = shutil.which('tar')
+    if not tool: raise ValueError('No archive reader for original source notices')
+    copied = []
+    def inspect(file, prefix):
+        nested = []
+        names = subprocess.check_output([tool, '-tf', str(file)], text=True).splitlines()
+        for name in names:
+            relative = Path(name)
+            if relative.is_absolute() or '..' in relative.parts:
+                raise ValueError('Unsafe source archive member: ' + name)
+            if name.endswith('/'): continue
+            notice = re.match(r'(?i)^(licen[cs]e|copying|copyright|notice|authors)', relative.name)
+            if notice or any(p.lower() == 'licenses' for p in relative.parts):
+                target = output / prefix / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open('wb') as stream:
+                    subprocess.run([tool, '-xOf', str(file), '--', name], stdout=stream, check=True)
+                copied.append(str(target))
+            elif name.endswith(('.tar.gz', '.tar.xz', '.tar.bz2', '.tar.lz', '.tar.zst', '.tgz', '.zip')):
+                nested.append(name)
+        return nested
+    with tempfile.TemporaryDirectory(prefix='source-notices-', dir=cache) as temp:
+        for index, name in enumerate(inspect(archive, 'package')):
+            file = Path(temp) / ('upstream-' + str(index))
+            with file.open('wb') as stream:
+                subprocess.run([tool, '-xOf', str(archive), '--', name], stdout=stream, check=True)
+            inspect(file, 'upstream-' + str(index))
+    if not copied: raise ValueError('Exact source contains no recognizable license notices: ' + source_record['name'])
+    return copied
+
+
+def package_notices(package, output, platform, source_record=None, cache=None):
     if platform == 'linux':
         source = Path('/usr/share/doc') / package.split(':')[0] / 'copyright'
         paths = [source] if source.is_file() else []
@@ -159,6 +202,8 @@ def package_notices(package, output, platform):
             path = host_path(value)
             if path.is_file(): paths.append(path)
     if not paths:
+        if platform == 'windows' and source_record is not None and cache is not None:
+            return source_notices(source_record, cache, output)
         raise ValueError('Missing installed license notices for ' + package)
     output.mkdir(parents=True)
     copied = []
@@ -223,7 +268,7 @@ def collect(args):
                 print('Collecting exact source and notices:', package, flush=True)
                 record = debian_source(package, args.apt_source_root, cache, args.fetch) if args.platform == 'linux' else msys_source(package, cache, args.fetch)
                 directory = re.sub(r'[^A-Za-z0-9_.-]', '_', package)
-                notices = package_notices(package, output / 'notices' / directory, args.platform)
+                notices = package_notices(package, output / 'notices' / directory, args.platform, record, cache)
                 packages[package] = {**record, 'noticeFiles': [str(Path(p).relative_to(output)) for p in notices]}
                 additional += record['records']
         row = {'path': str(file.relative_to(root)), 'sha256': sha256(file), 'package': package}
