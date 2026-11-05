@@ -103,7 +103,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <div id="download" class="download">
 <a id="recommended-download" class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/tag/4.9.9-espresso-1">Download TeXstudio Espresso</a>
 <a href="https://github.com/DominikPeters/texstudio-espresso/releases">Other releases on GitHub</a>
-<span class="meta">Version 4.9.9-espresso-1</span>
+<span class="meta"><span id="download-size" hidden></span>Version 4.9.9-espresso-1</span>
 </div>
 <script>
 (async () => {
@@ -147,6 +147,17 @@ figure.shot img { display: block; width: 100%; height: auto; }
   button.href = button.href.replace('/tag/', '/download/')
     + `/texstudio-espresso-${button.href.split('/').pop()}-${suffix}`;
   button.textContent = `Download for ${label}`;
+  // Published GitHub asset sizes in bytes; refresh alongside each release.
+  const sizes = {
+    'macos-arm64.zip': 150385469,
+    'macos-x86_64.zip': 154867942,
+    'windows-x86_64.zip': 165351502,
+    'linux-x86_64.deb': 108194890,
+    'linux-aarch64.deb': 107695398
+  };
+  const size = document.getElementById('download-size');
+  size.textContent = `${Math.round(sizes[suffix] / 1000000)} MB · `;
+  size.hidden = false;
 })();
 </script>
 

@@ -11,6 +11,8 @@ legacy `MacIntel` platform and `Intel Mac OS X` user agent do not identify an
 Intel CPU. Architecture requests time out after 250 ms or fall back on rejection.
 Mobile and unrecognized browsers, and visitors without JavaScript, get the
 GitHub release page. A separate GitHub link always provides all releases.
+The recommended binary's size appears before the version, rounded to decimal
+MB. Refresh the inline asset byte sizes from GitHub when updating the release.
 
 The **Deploy website** GitHub Actions workflow publishes changes to `site/` on
 `main`. It can also be run manually, with an optional dry run. Pull requests
