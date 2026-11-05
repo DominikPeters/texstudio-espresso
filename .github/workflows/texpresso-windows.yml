@@ -74,7 +74,7 @@ jobs:
       - name: Collect WSL engine dependency source evidence
         if: github.event_name == 'workflow_dispatch' && inputs.release
         run: |
-          python3 native/scripts/portable_inventory.py --platform linux \
+          python3 native/scripts/portable_inventory.py --platform linux --fetch \
             --root native/.bundles/linux-x86_64 --engine native/.bundles/linux-x86_64 \
             --output engine-license-evidence
           python3 native/scripts/source_release.py --plan engine-source-plan --inventory engine-license-evidence/inventory.json

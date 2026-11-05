@@ -7,6 +7,7 @@ substituted for the builder's package versions. Downloads require --fetch.
 """
 import argparse
 import html
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+import urllib.parse
 
 from common import ROOT, run, sha256
 from license_evidence import dictionary_evidence, copy_dictionary_notices
@@ -40,12 +42,53 @@ def control_fields(text):
     return result
 
 
-def debian_source(package, source_root):
+def archived_ubuntu_source(source, release, cache):
+    """Keep exact older runner inputs when superseded Sources entries disappear.
+
+    Launchpad retains the original source upload, including its signed .dsc.
+    HTTPS authenticates the archive provider; the descriptor binds each tarball
+    and patch by SHA256. Preserve the descriptor and its own hash in the release.
+    """
+    filename = source + '_' + release.split(':')[-1] + '.dsc'
+    base = ('https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/'
+            + urllib.parse.quote(source, safe='') + '/' + urllib.parse.quote(release, safe='') + '/')
+    url = base + urllib.parse.quote(filename, safe='')
+    file = cache / filename
+    if file.exists():
+        data = file.read_bytes()
+    else:
+        with urllib.request.urlopen(url, timeout=90) as response:
+            data = response.read(2 * 1024 * 1024 + 1)
+        if len(data) > 2 * 1024 * 1024:
+            raise ValueError('Oversized Ubuntu source descriptor')
+    payload = data.decode('utf-8').split('-----BEGIN PGP SIGNATURE-----', 1)[0]
+    # Armor headers belong to the signature, not the Debian Version field.
+    fields = control_fields(payload)
+    if fields.get('Source') != source or fields.get('Version') != release:
+        raise ValueError('Archived Ubuntu source identity differs from installed package')
+    files = [{'name': source + '-' + release + '-descriptor', 'url': url,
+              'sha256': hashlib.sha256(data).hexdigest()}]
+    for line in fields['Checksums-Sha256'].splitlines():
+        if not line.strip(): continue
+        digest, size, name = line.split()
+        if not re.fullmatch(r'[0-9a-f]{64}', digest) or Path(name).name != name:
+            raise ValueError('Invalid archived Ubuntu source record')
+        files.append({'name': source + '-' + release + '-' + name,
+                      'url': base + urllib.parse.quote(name, safe=''), 'sha256': digest})
+    if len(files) < 2: raise ValueError('Ubuntu source descriptor contains no source inputs')
+    file.write_bytes(data)
+    return {'name': source, 'version': release, 'records': files,
+            'sourceEvidence': 'Exact original Ubuntu upload and SHA256 source descriptor via HTTPS'}
+
+
+def debian_source(package, source_root, cache=None, fetch=False):
     source, release = run(['dpkg-query', '-W', '-f=${source:Package}\t${source:Version}', package], capture=True).split('\t')
     data = run(['apt-cache', 'showsrc', '--only-source', source], capture=True)
     records = [control_fields(part) for part in data.split('\n\n')]
     record = next((r for r in records if r.get('Version') == release), None)
     if not record:
+        if fetch and cache is not None and source_root.rstrip('/') == 'https://archive.ubuntu.com/ubuntu':
+            return archived_ubuntu_source(source, release, cache)
         raise ValueError(f'Exact Debian source unavailable: {source}={release}; enable deb-src for the builder repository')
     files = []
     for line in record['Checksums-Sha256'].splitlines():
@@ -168,7 +211,7 @@ def collect(args):
         if is_dll or '.so' in file.name:
             package = binary_owner(file, args.platform)
             if package not in packages:
-                record = debian_source(package, args.apt_source_root) if args.platform == 'linux' else msys_source(package, cache, args.fetch)
+                record = debian_source(package, args.apt_source_root, cache, args.fetch) if args.platform == 'linux' else msys_source(package, cache, args.fetch)
                 directory = re.sub(r'[^A-Za-z0-9_.-]', '_', package)
                 notices = package_notices(package, output / 'notices' / directory, args.platform)
                 packages[package] = {**record, 'noticeFiles': [str(Path(p).relative_to(output)) for p in notices]}

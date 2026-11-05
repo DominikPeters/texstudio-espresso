@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner
+from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source
 import subprocess
 import tempfile
 
@@ -39,3 +39,26 @@ class PortableInventory(unittest.TestCase):
             record = debian_source('libexample1', 'https://archive.ubuntu.com/ubuntu')
         self.assertEqual(record['records'][0]['sha256'], 'b' * 64)
         self.assertEqual(record['records'][0]['url'], 'https://archive.ubuntu.com/ubuntu/pool/main/e/example/example_2.1.orig.tar.xz')
+
+    def test_archived_ubuntu_descriptor_binds_exact_old_source_and_patch(self):
+        descriptor = ('-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\n'
+                      'Source: example\nVersion: 1:2.1-4ubuntu1\nChecksums-Sha256:\n '
+                      + 'a' * 64 + ' 42 example_2.1.orig.tar.xz\n '
+                      + 'b' * 64 + ' 10 example_2.1-4ubuntu1.debian.tar.xz\n'
+                      '-----BEGIN PGP SIGNATURE-----\nVersion: GnuPG v1\nsignature\n')
+        with tempfile.TemporaryDirectory() as temp:
+            cache = Path(temp)
+            (cache / 'example_2.1-4ubuntu1.dsc').write_text(descriptor)
+            record = archived_ubuntu_source('example', '1:2.1-4ubuntu1', cache)
+        self.assertEqual(record['version'], '1:2.1-4ubuntu1')
+        self.assertEqual(len(record['records']), 3)
+        self.assertEqual(record['records'][1]['sha256'], 'a' * 64)
+        self.assertIn('/1%3A2.1-4ubuntu1/', record['records'][1]['url'])
+        self.assertEqual(len(record['records'][0]['sha256']), 64)
+
+    def test_archived_source_cannot_substitute_another_version(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cache = Path(temp)
+            (cache / 'example_2.1-4.dsc').write_text('Source: example\nVersion: 2.1-3\n')
+            with self.assertRaisesRegex(ValueError, 'identity differs'):
+                archived_ubuntu_source('example', '2.1-4', cache)

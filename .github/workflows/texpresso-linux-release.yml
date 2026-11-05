@@ -101,7 +101,7 @@ jobs:
           build/package/opt/texstudio-espresso/libexec/texstudio/texpresso/bin/texpresso -capabilities
       - name: Collect exact source packages and distribution notices
         run: |
-          python3 native/scripts/portable_inventory.py --platform linux \
+          python3 native/scripts/portable_inventory.py --platform linux --fetch \
             --root build/package --engine "native/.bundles/linux-$(uname -m)" \
             --output build/package/opt/texstudio-espresso/share/texstudio/licenses
           python3 native/scripts/source_release.py --plan build/source-plan \
