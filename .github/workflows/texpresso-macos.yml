@@ -185,9 +185,8 @@ jobs:
           python3 native/scripts/notarize_app.py --app "$RUNNER_TEMP/deploy/TeXstudio Espresso.app" \
             --output "dist/texstudio-espresso-${{ steps.source.outputs.version }}-macos-${{ matrix.architecture }}.zip" \
             --reports notarization --timeout 25m
-          TEXPRESSO_TEST_ENGINE="$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/Helpers/texpresso/bin/texpresso" \
-            ctest --test-dir build/src/texpresso --output-on-failure
-          env QT_QPA_PLATFORM=offscreen "$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/MacOS/texstudio" --version
+          python3 native/scripts/verify_local_app.py --app "$RUNNER_TEMP/deploy/TeXstudio Espresso.app" \
+            --client-build build/src/texpresso --tests '.' --output packaged-verification
       - name: Upload the accepted app
         uses: actions/upload-artifact@v7
         with:
@@ -228,6 +227,7 @@ jobs:
           name: texstudio-espresso-macos-${{ matrix.architecture }}-diagnostics
           path: |
             notarization/
+            packaged-verification/
             build/CMakeFiles/CMakeConfigureLog.yaml
             build/src/texpresso/Testing/Temporary/
           if-no-files-found: ignore
