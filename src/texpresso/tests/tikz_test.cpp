@@ -54,7 +54,11 @@ void TikzTest::lexicalSourceRanges()
 void TikzTest::editorDiscovery()
 {
     QTemporaryDir temp; QVERIFY(temp.isValid());
+#ifdef Q_OS_WIN
+    const auto executable = temp.filePath("editor with spaces.exe");
+#else
     const auto executable = temp.filePath("editor with spaces");
+#endif
     write(executable, "fixture; never launched\n");
     QVERIFY(QFile::setPermissions(executable, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
     QCOMPARE(TexpressoTikz::findEditor(executable), executable);

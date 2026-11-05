@@ -45,6 +45,17 @@ QString TexpressoProcess::bundledEngine()
 QProcessEnvironment TexpressoProcess::texliveEnvironment()
 {
     auto env = QProcessEnvironment::systemEnvironment();
+#ifdef Q_OS_WIN
+    // WSL does not inherit arbitrary Windows environment variables. Preserve
+    // explicit profiling requests without forwarding unrelated host variables.
+    if (env.contains("TEXPRESSO_PROFILE")) {
+        auto names = env.value("WSLENV").split(':', Qt::SkipEmptyParts);
+        bool present = false;
+        for (const auto &name : names) present |= name.section('/', 0, 0) == "TEXPRESSO_PROFILE";
+        if (!present) names << "TEXPRESSO_PROFILE";
+        env.insert("WSLENV", names.join(':'));
+    }
+#endif
     auto paths = env.value("PATH").split(QDir::listSeparator(), Qt::SkipEmptyParts);
     // Finder-launched applications do not inherit shell configuration.
 #ifdef Q_OS_MACOS

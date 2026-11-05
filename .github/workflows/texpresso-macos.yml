@@ -44,9 +44,12 @@ jobs:
         id: source
         run: |
           python3 - <<'PY'
-          import json, os, subprocess
+          import json, os, subprocess, sys
+          sys.path.insert(0, 'native/scripts')
+          from product_release import version
           lock = json.load(open('native/dependencies.lock.json'))
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('version=' + version()['version'] + '\n')
               output.write('mupdf=' + lock['mupdf']['revision'] + '\n')
               output.write('zlibng=' + lock['zlibNg']['revision'] + '\n')
               output.write('commit=' + subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() + '\n')
@@ -131,7 +134,7 @@ jobs:
       - name: Deploy Qt, PDF dependencies, and the engine into the app
         run: |
           python3 native/scripts/deploy_macos.py --app build/texstudio.app \
-            --output "$RUNNER_TEMP/deploy/texstudio.app" \
+            --output "$RUNNER_TEMP/deploy/TeXstudio Espresso.app" \
             --macdeployqt "$(brew --prefix qt)/bin/macdeployqt" \
             --library-path "$RUNNER_TEMP/poppler/lib" --library-path "$(brew --prefix)/lib" \
             --poppler-data "$RUNNER_TEMP/poppler/share/poppler"
@@ -139,15 +142,15 @@ jobs:
         run: |
           python3 native/scripts/source_release.py \
             --plan .native-sources/source-input-plan \
-            --inventory "$RUNNER_TEMP/deploy/texstudio.app/Contents/Resources/licenses/inventory.json"
+            --inventory "$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/Resources/licenses/inventory.json"
           python3 native/scripts/source_release.py \
             --prefetch .native-sources/source-input-plan \
             --cache .native-sources/distribution-sources --fetch
           python3 native/scripts/collect_qt_notices.py \
-            --inventory "$RUNNER_TEMP/deploy/texstudio.app/Contents/Resources/licenses/inventory.json" \
+            --inventory "$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/Resources/licenses/inventory.json" \
             --cache .native-sources/distribution-sources --output native/notices/qt
           python3 native/scripts/collect_library_notices.py \
-            --inventory "$RUNNER_TEMP/deploy/texstudio.app/Contents/Resources/licenses/inventory.json" \
+            --inventory "$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/Resources/licenses/inventory.json" \
             --cache .native-sources/distribution-sources --output native/notices/library-sources
           python3 - <<'PY'
           import os, pathlib, subprocess, sys
@@ -156,18 +159,18 @@ jobs:
           prefix = pathlib.Path(subprocess.check_output(['brew', '--prefix'], text=True).strip())
           qt = pathlib.Path(subprocess.check_output(['brew', '--prefix', 'qt'], text=True).strip())
           runner = pathlib.Path(os.environ['RUNNER_TEMP'])
-          collect_license_inventory(runner / 'deploy/texstudio.app', qt / 'bin/macdeployqt',
+          collect_license_inventory(runner / 'deploy/TeXstudio Espresso.app', qt / 'bin/macdeployqt',
                                     [runner / 'poppler/lib', prefix / 'lib'], refresh=True)
           PY
           python3 native/scripts/source_release.py \
             --plan .native-sources/source-release-plan \
             --build-dir build \
-            --inventory "$RUNNER_TEMP/deploy/texstudio.app/Contents/Resources/licenses/inventory.json"
+            --inventory "$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/Resources/licenses/inventory.json"
           python3 native/scripts/source_release.py \
             --assemble .native-sources/source-release-plan \
             --cache .native-sources/distribution-sources --fetch \
             --dependencies dist/dependency-sources \
-            --output "dist/texstudio-texpresso-macos-${{ matrix.architecture }}-sources.zip"
+            --output "dist/texstudio-espresso-${{ steps.source.outputs.version }}-macos-${{ matrix.architecture }}-sources.zip"
       - name: Sign, notarize, staple, and verify the complete app
         timeout-minutes: 45
         env:
@@ -179,23 +182,23 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
         run: |
-          python3 native/scripts/notarize_app.py --app "$RUNNER_TEMP/deploy/texstudio.app" \
-            --output "dist/texstudio-texpresso-macos-${{ matrix.architecture }}.zip" \
+          python3 native/scripts/notarize_app.py --app "$RUNNER_TEMP/deploy/TeXstudio Espresso.app" \
+            --output "dist/texstudio-espresso-${{ steps.source.outputs.version }}-macos-${{ matrix.architecture }}.zip" \
             --reports notarization --timeout 25m
-          TEXPRESSO_TEST_ENGINE="$RUNNER_TEMP/deploy/texstudio.app/Contents/Helpers/texpresso/bin/texpresso" \
+          TEXPRESSO_TEST_ENGINE="$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/Helpers/texpresso/bin/texpresso" \
             ctest --test-dir build/src/texpresso --output-on-failure
-          env QT_QPA_PLATFORM=offscreen "$RUNNER_TEMP/deploy/texstudio.app/Contents/MacOS/texstudio" --version
+          env QT_QPA_PLATFORM=offscreen "$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/MacOS/texstudio" --version
       - name: Upload the accepted app
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-texpresso-macos-${{ matrix.architecture }}-notarized
+          name: texstudio-espresso-macos-${{ matrix.architecture }}-notarized
           path: dist/*.zip*
           if-no-files-found: error
           retention-days: 14
       - name: Upload reusable dependency sources
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-texpresso-macos-${{ matrix.architecture }}-dependency-sources
+          name: texstudio-espresso-macos-${{ matrix.architecture }}-dependency-sources
           path: dist/dependency-sources/
           if-no-files-found: error
           retention-days: 14
@@ -206,6 +209,7 @@ jobs:
         run: |
           echo "Built texpresso commit: $SOURCE_COMMIT" >> "$GITHUB_STEP_SUMMARY"
           echo "Architecture: ${{ matrix.architecture }}" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/deploy/TeXstudio Espresso.app/Contents/Resources/runtime-requirements.json" >> "$GITHUB_STEP_SUMMARY"
           echo 'App signed with Developer ID, accepted by Apple, stapled and Gatekeeper-verified.' >> "$GITHUB_STEP_SUMMARY"
       - name: Remove credentials after failure or cancellation
         if: always()
@@ -221,7 +225,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-texpresso-macos-${{ matrix.architecture }}-diagnostics
+          name: texstudio-espresso-macos-${{ matrix.architecture }}-diagnostics
           path: |
             notarization/
             build/CMakeFiles/CMakeConfigureLog.yaml

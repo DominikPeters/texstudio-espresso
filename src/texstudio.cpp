@@ -13014,7 +13014,11 @@ void Texstudio::colorSchemeChanged(Qt::ColorScheme colorScheme)
  * \brief open webpage with txs issue submit
  */
 void Texstudio::openBugsAndFeatures() {
-	QDesktopServices::openUrl(QUrl("https://github.com/texstudio-org/texstudio/issues/"));
+	#ifdef TEXSTUDIO_TEXPRESSO
+    QDesktopServices::openUrl(QUrl("https://github.com/DominikPeters/texstudio-espresso/issues/"));
+#else
+    QDesktopServices::openUrl(QUrl("https://github.com/texstudio-org/texstudio/issues/"));
+#endif
 }
 /*!
  * \brief manipulate QMainWindowTabBar which contains the tabbed QDockWidget to only show icons

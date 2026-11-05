@@ -40,7 +40,7 @@ void AboutDialog::largeLogo()
 	QLabel *label = new QLabel(dlg);
 	label->setPixmap(QPixmap(":/images/splash_large.png"));
 	dlg->layout()->addWidget(label);
-	dlg->setWindowTitle("TeXstudio");
+	dlg->setWindowTitle(TEXSTUDIO);
 	dlg->exec();
 }
 
@@ -52,20 +52,26 @@ void AboutDialog::setText(QString latestVersion) {
                 + "\">" + tr("Licenses and corresponding source") + "</a><br>";
     }
     QString changelogPath = findResourceFile("CHANGELOG.md");
+#ifdef TEXSTUDIO_TEXPRESSO
+    changelogPath = TEXSTUDIO_ESPRESSO_RELEASES;
+    const QString projectHome = TEXSTUDIO_ESPRESSO_HOME;
+#else
+    const QString projectHome = "https://texstudio.org/";
+#endif
     if(changelogPath.isEmpty()){
         changelogPath="https://texstudio-org.github.io/CHANGELOG.html";
     }else{
-        if(!changelogPath.startsWith("/")){
+        if(!changelogPath.startsWith("/") && !changelogPath.startsWith("https://")){
             changelogPath="/"+changelogPath;
         }
-        changelogPath="file://"+changelogPath;
+        if (!changelogPath.startsWith("https://")) changelogPath="file://"+changelogPath;
     }
     if (latestVersion=="") latestVersion = tr("couldn't retrieve data");
     ui.textBrowser->setOpenExternalLinks(true);
     ui.textBrowser->setHtml(QString("<b>%1 %2</b> (git %3)").arg(TEXSTUDIO,TXSVERSION,TEXSTUDIO_GIT_REVISION ? TEXSTUDIO_GIT_REVISION : "n/a") + "<br>" +
                             tr("Using Qt Version %1, compiled with Qt %2 %3").arg(qVersion(),QT_VERSION_STR,COMPILED_DEBUG_OR_RELEASE) + "<br><br>" +
-                            tr("Project home site:") + " <a href=\"https://texstudio.org/\">https://texstudio.org/</a><br>" +
-                            tr("Latest stable version: %1").arg(latestVersion)+"<br>" +
+                            tr("Project home site:") + " <a href=\"" + projectHome + "\">" + projectHome + "</a><br>" +
+                            tr("Latest release: %1").arg(latestVersion.toHtmlEscaped())+"<br>" +
                             "<a href=\""+changelogPath+"\">"+tr("Changelog")+"</a><br><br>"+
                             licensingLinks +
 	                        "Copyright (c)<br>" +

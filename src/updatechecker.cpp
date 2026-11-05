@@ -1,6 +1,9 @@
 #include "updatechecker.h"
 #include "smallUsefulFunctions.h"
 #include "utilsVersion.h"
+#ifdef TEXSTUDIO_TEXPRESSO
+#include "texpresso/productrelease.h"
+#endif
 #include "configmanager.h"
 #include <QNetworkProxyFactory>
 #include <QMutex>
@@ -54,8 +57,12 @@ void UpdateChecker::check(bool silent, int currentComboBoxUpdateLevel)
 
 	this->silent = silent;
     networkManager = new QNetworkAccessManager();
-    QNetworkRequest request = QNetworkRequest(QUrl("https://api.github.com/repos/texstudio-org/texstudio/git/refs/tags"));
-	request.setRawHeader("User-Agent", "TeXstudio Update Checker");
+#ifdef TEXSTUDIO_TEXPRESSO
+    QNetworkRequest request(QUrl("https://api.github.com/repos/DominikPeters/texstudio-espresso/releases?per_page=100"));
+#else
+    QNetworkRequest request(QUrl("https://api.github.com/repos/texstudio-org/texstudio/git/refs/tags"));
+#endif
+	request.setRawHeader("User-Agent", TEXSTUDIO " Update Checker");
 	QNetworkReply *reply = networkManager->get(request);
 	connect(reply, SIGNAL(finished()), this, SLOT(onRequestCompleted()));
 	if (!silent)
@@ -105,6 +112,13 @@ void UpdateChecker::onRequestCompleted()
 
 void UpdateChecker::parseData(const QByteArray &data)
 {
+#ifdef TEXSTUDIO_TEXPRESSO
+    const int level = comboBoxUpdateLevel >= 0 ? comboBoxUpdateLevel
+        : ConfigManager::getInstance()->getOption("Update/UpdateLevel").toInt();
+    latestProductTag = TeXstudioProductRelease::latest(data, level > 0);
+    emit dataParsed(latestProductTag.isEmpty() ? tr("No matching release published yet") : latestProductTag);
+    return;
+#endif
     // parsing of github api result (tags)
     QString result=QString(data);
 	QStringList items = Version::parseGitData(result);
@@ -154,6 +168,20 @@ void UpdateChecker::parseData(const QByteArray &data)
 
 void UpdateChecker::checkForNewVersion()
 {
+#ifdef TEXSTUDIO_TEXPRESSO
+    const auto current = TeXstudioProductRelease::version(QStringLiteral(TXSVERSION));
+    const auto latest = TeXstudioProductRelease::version(latestProductTag);
+    if (!latest.isEmpty() && current < latest) {
+        notify(tr("TeXstudio Espresso %1 is available.").arg(latestProductTag.toHtmlEscaped())
+               + "<br><a href=\"" TEXSTUDIO_ESPRESSO_RELEASES "\">" + tr("Download TeXstudio Espresso") + "</a>");
+    } else if (!silent) {
+        UtilsUi::txsInformation(latest.isEmpty() ? tr("No matching TeXstudio Espresso release has been published yet.")
+            : tr("Your TeXstudio Espresso version %1 is up-to-date.").arg(QStringLiteral(TXSVERSION)));
+    }
+    ConfigManager::getInstance()->setOption("Update/LastCheck", QDateTime::currentDateTime());
+    emit checkCompleted();
+    return;
+#endif
 	// updateLevel values from comboBoxUpdateLevel indices:
 	// 0: stable, 1: release candidate, 2: development (alpha, beta)
 	// Config dialog (check button) passes correct current index from dialog, so user can check with different settings without closing dialog
@@ -244,7 +272,7 @@ void UpdateChecker::checkForNewVersion()
 void UpdateChecker::notify(QString message)
 {
 	QMessageBox msgBox;
-	msgBox.setWindowTitle(tr("TeXstudio Update"));
+	msgBox.setWindowTitle(QStringLiteral(TEXSTUDIO) + tr(" Update"));
 	msgBox.setTextFormat(Qt::RichText);
 	msgBox.setText(message);
 	msgBox.setStandardButtons(QMessageBox::Ok);

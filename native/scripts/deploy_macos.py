@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from common import run, sha256
 from notarize import MACHO
+from product_release import version as product_version, macos_requirements
 
 
 def macho_files(app):
@@ -213,12 +214,23 @@ def main():
         run(['install_name_tool', '-add_rpath', '@executable_path/../Frameworks', main])
     verify_dependencies(app)
     refresh_engine_manifest(app)
+    requirements = macos_requirements(app, macho_files(app))
+    plist['LSMinimumSystemVersion'] = requirements['minimumMacOSVersion']
+    plist['CFBundleShortVersionString'] = product_version()['base']
+    # Apple's numeric bundle version is separate from the displayed fork tag.
+    plist['CFBundleVersion'] = product_version()['revision']
+    plist['TeXstudioEspressoVersion'] = product_version()['version']
+    with plist_path.open('wb') as stream:
+        plistlib.dump(plist, stream)
+    (app / 'Contents/Resources/runtime-requirements.json').write_text(json.dumps(requirements, indent=2) + '\n')
     revision = run(['git', 'rev-parse', 'HEAD'], capture=True)
     runtime = json.loads((metadata / 'build-manifest.json').read_text())
     (app / 'Contents/Resources/texpresso-release.json').write_text(json.dumps({
-        'sourceRevision': revision, 'sourceBranch': 'texpresso',
+        'sourceRevision': revision, 'sourceBranch': run(['git', 'branch', '--show-current'], capture=True),
+        'productVersion': product_version()['version'],
         'engineRevision': runtime['engineRevision'], 'architecture': platform.machine(),
-        'requires': 'User-installed TeX Live',
+        'requires': 'User-installed TeX Live or MiKTeX',
+        'minimumMacOSVersion': requirements['minimumMacOSVersion'],
     }, indent=2) + '\n')
     # Preserve the actual distributed code/data inventory, not just the engine's
     # dynamic dependencies. This records incomplete evidence without claiming

@@ -11,14 +11,20 @@ def copy_qt_notices(key, package, destination):
     manifest = ROOT / 'native/notices/qt/manifest.json'
     if not manifest.is_file():
         return []
-    record = next((r for r in json.loads(manifest.read_text()) if r['package'] == key), None)
-    if not record:
-        return []
     expected = next((r['checksumValue'] for r in package.get('sourceChecksums', [])
                      if r['algorithm'] == 'SHA256'), None)
+    records = json.loads(manifest.read_text())
+    record = next((r for r in records if r['package'] == key), None)
+    if not record:
+        # A package-manager rebuild can retain byte-identical upstream sources.
+        # Reuse their verified notices, while retaining the new package recipe.
+        record = next((r for r in records if expected and r['sha256'] == expected
+                       and r['url'] == package.get('source')), None)
+    if not record:
+        return []
     if expected != record['sha256']:
         raise ValueError(f'Qt notice source does not match installed source checksum: {key}')
-    source = manifest.parent / key
+    source = manifest.parent / record['package']
     for entry in record['files']:
         file = source / entry['path']
         if not file.resolve().is_relative_to(source.resolve()) or sha256(file) != entry['sha256']:

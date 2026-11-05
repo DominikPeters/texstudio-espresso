@@ -195,7 +195,7 @@ bool handleCommandLineOnly(const QStringList &cmdLine) {
 	}
 
 	if (cmdLine.contains("--version")) {
-        QTextStream(stdout) << "TeXstudio " << TXSVERSION << " (" << TEXSTUDIO_GIT_REVISION << ")\n";
+        QTextStream(stdout) << TEXSTUDIO << " " << TXSVERSION << " (" << TEXSTUDIO_GIT_REVISION << ")\n";
 		return true;
 	}
 

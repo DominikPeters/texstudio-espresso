@@ -1,9 +1,14 @@
 #ifndef Header_UtilsVersion
 #define Header_UtilsVersion
 
+#include "productversion.h"
+#ifdef TEXSTUDIO_TEXPRESSO
+#define TEXSTUDIO "TeXstudio Espresso"
+#define TXSVERSION TEXSTUDIO_ESPRESSO_VERSION
+#else
 #define TEXSTUDIO "TeXstudio"
-
-#define TXSVERSION "4.9.9"
+#define TXSVERSION TEXSTUDIO_UPSTREAM_VERSION
+#endif
 
 extern const char *TEXSTUDIO_GIT_REVISION;
 

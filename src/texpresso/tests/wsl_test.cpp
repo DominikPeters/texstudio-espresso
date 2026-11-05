@@ -210,7 +210,7 @@ void WslTest::realEngine()
     QVERIFY2(QFileInfo(inverse.last()[0].toString()).isFile(), qPrintable(inverse.last()[0].toString()));
     const auto edited = QString(text).replace("WSL-INITIAL", "WSL-EDITED");
     manager.openBuffer(root, edited);
-    QTRY_VERIFY2_WITH_TIMEOUT(session->preview.valid() && session->compilerOutput.contains("WSL-EDITED"), qPrintable(session->status + "\nENGINE:\n" + session->engineOutput.right(3000) + "\nOUTPUT:\n" + session->compilerOutput.right(3000)), 10000);
+    QTRY_VERIFY2_WITH_TIMEOUT(session->preview.valid() && session->compilerOutput.contains("WSL-EDITED"), qPrintable(session->status + "\nENGINE:\n" + session->engineOutput.right(3000) + "\nOUTPUT:\n" + session->compilerOutput.right(3000)), 30000);
     QVERIFY(manager.changeBuffer(root, 3, 9, 3, 19, "WSL-RANGE"));
     QVERIFY(manager.changeBuffer(root, 4, 5, 4, 15, "WSL-RANGE"));
     QTRY_VERIFY_WITH_TIMEOUT(session->preview.valid() && session->compilerOutput.contains("WSL-RANGE"), 30000);

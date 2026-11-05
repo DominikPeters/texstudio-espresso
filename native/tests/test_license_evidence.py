@@ -17,6 +17,24 @@ from license_inventory import package_metadata
 
 
 class LicenseEvidence(unittest.TestCase):
+    def test_qt_rebuild_reuses_notices_only_for_identical_upstream_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / 'native/notices/qt/qtbase-6.12.0_1'
+            source.mkdir(parents=True)
+            (source / 'LICENSE').write_bytes(b'original Qt attribution')
+            digest = hashlib.sha256(b'original Qt attribution').hexdigest()
+            url = 'https://example.org/qtbase-6.12.0.tar.xz'
+            record = {'package': source.name, 'url': url, 'sha256': 'a' * 64,
+                      'files': [{'path': 'LICENSE', 'sha256': digest}]}
+            (source.parent / 'manifest.json').write_text(json.dumps([record]))
+            package = {'source': url, 'sourceChecksums': [{'algorithm': 'SHA256', 'checksumValue': 'a' * 64}]}
+            with patch.object(license_evidence, 'ROOT', root):
+                result = license_evidence.copy_qt_notices('qtbase-6.12.0_2', package, root / 'output')
+                self.assertEqual(result[0].read_bytes(), b'original Qt attribution')
+                package['source'] = 'https://example.org/a-different-module.tar.xz'
+                self.assertEqual(license_evidence.copy_qt_notices('qtbase-6.12.0_3', package, root / 'other'), [])
+
     def test_dictionary_notice_is_bound_to_exact_payload_and_members(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
