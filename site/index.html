@@ -59,10 +59,6 @@ main.wrap { padding-top: 24px; padding-bottom: 32px; }
 h1 { margin: 0; font-size: 32px; font-weight: 600; line-height: 1.25; }
 .lead { margin: 12px 0 0; max-width: 720px; font-size: 18px; color: var(--text-2); }
 .download { margin-top: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
-.platform-picker { flex-basis: 100%; display: flex; align-items: center; gap: 10px; }
-.platform-picker select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
-.platform-downloads { display: flex; flex-wrap: wrap; gap: 12px 20px; }
-.platform-picker[hidden], .platform-downloads[hidden] { display: none; }
 :focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 .button { display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: 6px; background: var(--button); color: #ffffff; font-weight: 600; text-decoration: none; }
 .button:hover { background: var(--button-hover); color: #ffffff; }
@@ -105,52 +101,52 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <p class="lead">A fork of the TeXstudio LaTeX editor with a live preview. The preview is produced by TeXpresso and updates while you edit, without running a separate compile.</p>
 
 <div id="download" class="download">
-<div class="platform-picker" hidden>
-<label for="download-platform">Download for</label>
-<select id="download-platform">
-<option value="all">All platforms</option>
-<option value="macos">macOS</option>
-<option value="windows">Windows</option>
-<option value="linux">Linux</option>
-</select>
-</div>
-<div class="platform-downloads" data-platform="macos">
-<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-macos-arm64.zip">macOS · Apple Silicon</a>
-<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-macos-x86_64.zip">macOS · Intel</a>
-</div>
-<div class="platform-downloads" data-platform="windows">
-<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-windows-x86_64.zip">Windows · x64</a>
-</div>
-<div class="platform-downloads" data-platform="linux">
-<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-linux-x86_64.deb">Linux · x64 (.deb)</a>
-<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-linux-aarch64.deb">Linux · ARM64 (.deb)</a>
-</div>
-<span class="meta">Version 4.9.9-espresso-1 · <a href="https://github.com/DominikPeters/texstudio-espresso/releases/tag/4.9.9-espresso-1">Release notes and sources</a></span>
+<a id="recommended-download" class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/tag/4.9.9-espresso-1">Download TeXstudio Espresso</a>
+<a href="https://github.com/DominikPeters/texstudio-espresso/releases">Other releases on GitHub</a>
+<span class="meta">Version 4.9.9-espresso-1</span>
 </div>
 <script>
-(() => {
-  const picker = document.querySelector('.platform-picker');
-  const select = document.getElementById('download-platform');
-  const downloads = document.querySelectorAll('.platform-downloads');
+(async () => {
+  const button = document.getElementById('recommended-download');
   const ua = navigator.userAgent || '';
   const platform = navigator.userAgentData?.platform || navigator.platform || ua;
-  // iPads can report macOS in desktop mode; phones/tablets get all downloads.
-  const mobile = navigator.userAgentData?.mobile || /Android|iPhone|iPad|iPod/i.test(ua)
-    || (/Mac/i.test(platform) && navigator.maxTouchPoints > 1);
-  if (!mobile) {
-    if (/Win/i.test(platform)) select.value = 'windows';
-    else if (/Mac/i.test(platform)) select.value = 'macos';
-    else if (/Linux/i.test(platform)) select.value = 'linux';
-  }
-  // Keep both CPU architectures: browser platform strings can conceal the CPU.
-  const update = () => {
-    for (const group of downloads) {
-      group.hidden = select.value !== 'all' && group.dataset.platform !== select.value;
+  // iPads can report macOS in desktop mode; keep the release page on mobile.
+  if (navigator.userAgentData?.mobile || /Android|iPhone|iPad|iPod/i.test(ua)
+      || (/Mac/i.test(platform) && navigator.maxTouchPoints > 1)) return;
+  const os = /Win/i.test(platform) ? 'windows' : /Mac/i.test(platform) ? 'macos'
+    : /Linux/i.test(platform) ? 'linux' : '';
+  if (!os) return;
+
+  // "MacIntel" and "Intel Mac OS X" are also reported on Apple Silicon.
+  // Use explicit CPU hints when available, with a bounded wait and a best guess.
+  let architecture = '';
+  if (os !== 'windows' && navigator.userAgentData?.getHighEntropyValues) {
+    let timeout;
+    try {
+      const hints = await Promise.race([
+        navigator.userAgentData.getHighEntropyValues(['architecture']),
+        new Promise(resolve => { timeout = setTimeout(() => resolve({}), 250); })
+      ]);
+      architecture = hints.architecture || '';
+    } catch {
+      // Browser policy may withhold architecture; the fallback stays usable.
+    } finally {
+      clearTimeout(timeout);
     }
-  };
-  select.addEventListener('change', update);
-  update();
-  picker.hidden = false;
+  }
+  let arm = os === 'macos' || /aarch64|arm64|armv8/i.test(platform + ' ' + ua);
+  if (/^arm/i.test(architecture)) arm = true;
+  else if (/^x86/i.test(architecture)) arm = false;
+
+  const cpu = arm ? 'arm64' : 'x86_64';
+  const suffix = os === 'linux' ? `linux-${arm ? 'aarch64' : cpu}.deb`
+    : `${os}-${os === 'windows' ? 'x86_64' : cpu}.zip`;
+  const label = os === 'macos' ? `macOS · ${arm ? 'Apple Silicon' : 'Intel'}`
+    : os === 'windows' ? 'Windows · x64' : `Linux · ${arm ? 'ARM64' : 'x64'} (.deb)`;
+  // Derive the asset from the static release link, keeping one version to update.
+  button.href = button.href.replace('/tag/', '/download/')
+    + `/texstudio-espresso-${button.href.split('/').pop()}-${suffix}`;
+  button.textContent = `Download for ${label}`;
 })();
 </script>
 

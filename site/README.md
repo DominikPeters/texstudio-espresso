@@ -3,11 +3,14 @@
 The static files in this directory are served at
 <https://pref.tools/texstudio-espresso/>. No build step is needed.
 
-The download picker selects macOS, Windows or Linux using browser platform
-information. Visitors can choose another platform or show all downloads. Mobile
-and unrecognized browsers show all platforms, as does the page without
-JavaScript. Both Mac and Linux CPU options remain available because browser
-platform strings do not reliably identify the CPU architecture.
+The main download button recommends a binary for the browser's OS. CPU
+architecture Client Hints distinguish Apple Silicon from Intel and Linux ARM64
+from x64 when available. Without those hints, Macs default to Apple Silicon and
+Linux uses explicit ARM platform/user-agent tokens or defaults to x64. The
+legacy `MacIntel` platform and `Intel Mac OS X` user agent do not identify an
+Intel CPU. Architecture requests time out after 250 ms or fall back on rejection.
+Mobile and unrecognized browsers, and visitors without JavaScript, get the
+GitHub release page. A separate GitHub link always provides all releases.
 
 The **Deploy website** GitHub Actions workflow publishes changes to `site/` on
 `main`. It can also be run manually, with an optional dry run. Pull requests
