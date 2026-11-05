@@ -227,7 +227,7 @@ void LinksUiTest::realContinuousSecondaryPage()
         // canvas refresh. Wait for clickable annotations at the current width.
         for (auto item : widget.findChildren<TexpressoCanvas *>("texpressoNeighborPage"))
             if (item->isVisible() && item->fresh && item->property("texpressoPage").toInt() == 1
-                && session->preview.pageValid(1) && item->annotations == session->preview.annotationsForPage(1)) { secondary = item; return true; }
+                && session->preview.pageValid(1) && item->pixels.cacheKey() == session->preview.pageImage(1).cacheKey()) { secondary = item; return true; }
         return false;
     };
     QTRY_VERIFY_WITH_TIMEOUT(findSecondary(), 20000);
