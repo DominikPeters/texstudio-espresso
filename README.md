@@ -15,7 +15,7 @@ switching tabs. Normal TeXstudio build commands remain available for final PDFs.
 Open a saved `.tex` project to start. The preview includes continuous scrolling,
 page navigation, zoom and magnification, source synchronization, hyperlinks,
 Pause/Resume, Stop, Restart and Output controls. Command-click on macOS
-(Ctrl-click on Linux) jumps from the preview to the source.
+(Ctrl-click on Windows or Linux) jumps from the preview to the source.
 View → Show → Live Preview enables or disables automatic preview.
 The shared toolbar switches between live preview and the compiled PDF.
 
@@ -27,8 +27,17 @@ The shared toolbar switches between live preview and the compiled PDF.
 - [Windows and WSL setup](native/WINDOWS.md)
 - [Background testing and validation](native/TESTING.md)
 
-Build workflows provide artifacts in GitHub Actions. Release downloads, when
-published, are available on the [releases page](https://github.com/DominikPeters/texstudio-espresso/releases).
+Download the [latest release](https://github.com/DominikPeters/texstudio-espresso/releases/latest)
+for macOS (Apple Silicon or Intel), Windows x64 with WSL2, or Linux x64/ARM64
+(Debian packages). macOS apps are Developer ID signed and notarized; the Windows
+portable ZIP is unsigned. Each release includes matching source archives,
+original notices, checksums and runtime requirements derived from the shipped
+stack. Development build artifacts remain available in GitHub Actions.
+
+Install TeX Live or MiKTeX separately; on Windows it belongs inside the selected
+WSL2 distribution. See the [website](https://pref.tools/texstudio-espresso/)
+for installation instructions and the [release process](native/RELEASING.md)
+for packaging and source-distribution details.
 
 ## Development and contributions
 

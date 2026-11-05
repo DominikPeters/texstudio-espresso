@@ -62,6 +62,7 @@ h1 { margin: 0; font-size: 32px; font-weight: 600; line-height: 1.25; }
 .button { display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: 6px; background: var(--button); color: #ffffff; font-weight: 600; text-decoration: none; }
 .button:hover { background: var(--button-hover); color: #ffffff; }
 .meta { font-size: 14px; color: var(--muted); }
+.download .meta { flex-basis: 100%; }
 
 figure.shot { margin: 40px 0 0; }
 figure.shot .frame { border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
@@ -99,8 +100,10 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <p class="lead">A fork of the TeXstudio LaTeX editor with a live preview. The preview is produced by TeXpresso and updates while you edit, without running a separate compile.</p>
 
 <div id="download" class="download">
-<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso-release.yml">macOS test builds</a>
-<span class="meta">In development · <a href="https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso-windows.yml">Windows test builds</a> · <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/README.md">Build from source</a></span>
+<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-macos-arm64.zip">macOS · Apple Silicon</a>
+<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-windows-x86_64.zip">Windows · x64</a>
+<a class="button" href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-linux-x86_64.deb">Linux · x64 (.deb)</a>
+<span class="meta">Version 4.9.9-espresso-1 · Also available: <a href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-macos-x86_64.zip">Intel Mac</a>, <a href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/texstudio-espresso-4.9.9-espresso-1-linux-aarch64.deb">Linux ARM64</a> · <a href="https://github.com/DominikPeters/texstudio-espresso/releases/tag/4.9.9-espresso-1">Release notes and sources</a></span>
 </div>
 
 <figure class="shot">
@@ -124,7 +127,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <li>Starts automatically when you open a saved <code>.tex</code> project.</li>
 <li>Each open project keeps its own session and preview position when you switch tabs.</li>
 <li>Page navigation, zoom, Pause/Resume, Stop, Restart, Output and Sync.</li>
-<li>Command-click in the preview (Ctrl-click on Linux) jumps to the source line.</li>
+<li>Command-click in the preview (Ctrl-click on Windows or Linux) jumps to the source line.</li>
 <li>Turn it off under View → Show → Live Preview.</li>
 </ul>
 </section>
@@ -138,8 +141,9 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <h2>Requirements</h2>
 <ul>
 <li>A TeX Live installation (on macOS, for example MacTeX) or MiKTeX, which provides the packages.</li>
-<li>The TeXpresso engine is bundled; nothing else to install.</li>
-<li>macOS or Linux. On Windows, live compilation runs inside WSL2; see the <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/WINDOWS.md">setup guide</a>.</li>
+<li>The TeXpresso engine is bundled.</li>
+<li>macOS 15 or newer; or 64-bit Linux with glibc 2.38 or newer and the system libraries listed in the <a href="https://github.com/DominikPeters/texstudio-espresso/releases/download/4.9.9-espresso-1/runtime-requirements.json">release requirements</a>.</li>
+<li>On Windows, live compilation runs inside WSL2; see the <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/WINDOWS.md">setup guide and requirements</a>.</li>
 </ul>
 </section>
 
@@ -147,7 +151,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 <h2>Installation</h2>
 <ol>
 <li>Install TeX Live or MiKTeX if you do not have it. On Windows, install it inside WSL2.</li>
-<li>Download a test build from a successful GitHub Actions run (a GitHub account is required). On macOS, extract the app and move it to Applications. Public releases will be listed on the <a href="https://github.com/DominikPeters/texstudio-espresso/releases">releases page</a>.</li>
+<li>Download the release for your platform above. On macOS, extract the signed, notarized app and move it to Applications. On Windows, extract the ZIP and run <code>texstudio.exe</code> (the Windows build is unsigned). On Linux, install the <code>.deb</code> with your package manager.</li>
 <li>Open a saved <code>.tex</code> file. The preview appears next to the editor.</li>
 </ol>
 <p>To build from source, see the <a href="https://github.com/DominikPeters/texstudio-espresso/blob/main/native/README.md">build instructions</a>.</p>
@@ -155,7 +159,7 @@ figure.shot img { display: block; width: 100%; height: auto; }
 
 <section>
 <h2>Source and license</h2>
-<p>Free software under the GNU GPL, version 3. Source code, build instructions and issue tracker are on <a href="https://github.com/DominikPeters/texstudio-espresso">GitHub</a>. Based on <a href="https://www.texstudio.org">TeXstudio</a> and on <a href="https://github.com/let-def/texpresso">TeXpresso</a> by Frédéric Bour.</p>
+<p>Free software. The editor is distributed under the GNU GPL, version 3; bundled components retain their own licenses, including AGPL, LGPL and permissive licenses. Matching source downloads and original notices accompany each <a href="https://github.com/DominikPeters/texstudio-espresso/releases">release</a>. Source code, build instructions and issue tracker are on <a href="https://github.com/DominikPeters/texstudio-espresso">GitHub</a>. Based on <a href="https://www.texstudio.org">TeXstudio</a> and on <a href="https://github.com/let-def/texpresso">TeXpresso</a> by Frédéric Bour.</p>
 </section>
 
 <section>
