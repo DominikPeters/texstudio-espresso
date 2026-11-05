@@ -13,6 +13,9 @@ on:
         options: ['0', '1', '10', '30']
 permissions:
   contents: read
+concurrency:
+  group: live-preview-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
   checkpoint-cleanup:
     strategy:
@@ -35,11 +38,19 @@ jobs:
           submodules: true
       - name: Install Qt, engine build dependencies and TeX Live
         run: |
-          # The runner's Azure mirror can trickle large TeX downloads for tens
-          # of minutes. Use Ubuntu's canonical HTTPS archive for this job.
-          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
-            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          # Handle both direct URLs and the runner's mirror+file configuration.
+          ubuntu_mirror=https://archive.ubuntu.com/ubuntu
+          if [ "$(dpkg --print-architecture)" = arm64 ]; then
+            ubuntu_mirror=https://ports.ubuntu.com/ubuntu-ports
           fi
+          for mirror_list in /etc/apt/apt-mirrors*.txt; do
+            [ -f "$mirror_list" ] || continue
+            printf '%s\n' "$ubuntu_mirror" | sudo tee "$mirror_list"
+          done
+          for apt_sources in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            [ -f "$apt_sources" ] || continue
+            sudo sed -E -i "s|https?://azure.archive.ubuntu.com/ubuntu|$ubuntu_mirror|g" "$apt_sources"
+          done
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build build-essential pkg-config patchelf \
