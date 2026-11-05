@@ -244,13 +244,6 @@ jobs:
           path: dist/*.zip*
           if-no-files-found: error
           retention-days: 30
-      - uses: actions/upload-artifact@v7
-        if: github.event_name == 'workflow_dispatch' && inputs.release
-        with:
-          name: texstudio-espresso-windows-x86_64-dependency-sources
-          path: dist/dependency-sources/
-          if-no-files-found: error
-          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: TeXstudio-Espresso-Windows-WSL-development

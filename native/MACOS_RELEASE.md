@@ -41,8 +41,7 @@ The workflow submits a temporary ZIP to Apple and requires explicit `Accepted`
 status. It then staples and validates the ticket, checks Gatekeeper and strict
 code signatures, exercises the signed engine, and packages a signed, notarized DMG with an Applications shortcut, Finder icon
 layout and coffee-cup artwork. It uploads the final DMG plus
-SHA-256 checksum and matching project-source ZIP. Reusable dependency sources are
-uploaded as a separate artifact. Source preparation runs before signing and
+SHA-256 checksum and matching project-source ZIP. Dependency source caches stay on the builder. Source preparation runs before signing and
 fails if a required archive or patch is missing. Failed or timed-out notarization does not publish an app.
 Diagnostics are uploaded separately. Both artifacts expire after 14 days.
 Ticket stapling and validation retry temporary ticket-service failures for a

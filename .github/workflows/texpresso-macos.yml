@@ -198,13 +198,6 @@ jobs:
             dist/*.dmg*
           if-no-files-found: error
           retention-days: 14
-      - name: Upload reusable dependency sources
-        uses: actions/upload-artifact@v7
-        with:
-          name: texstudio-espresso-macos-${{ matrix.architecture }}-dependency-sources
-          path: dist/dependency-sources/
-          if-no-files-found: error
-          retention-days: 14
       - name: Build provenance
         if: success()
         env:

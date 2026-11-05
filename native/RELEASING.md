@@ -11,9 +11,9 @@ Imported upstream Git tags are never offered as product updates.
 Run **Prepare TeXstudio Espresso release** on `main` after committing the release
 changes. Its reusable workflows build macOS arm64/Intel, Windows x64 with WSL2,
 and Linux x64/ARM64 from the same commit. The final job runs only after all
-platform jobs succeed. It checks every matching project source ZIP, engine
-gitlink and dependency source hash, combines reusable dependency archives,
-generates release notes/checksums, and creates a **draft** GitHub release.
+platform jobs succeed. It checks the project source revisions, engine gitlink
+and verified Mac disk-image metadata, collects exact source references and build
+recipes, generates release notes/checksums, and creates a **draft** GitHub release.
 Review the concrete draft and then publish it. The workflow does not install or
 restart a local app. The macOS release candidates are Developer ID signed,
 notarized and stapled; local development builds remain ad-hoc signed.
@@ -28,7 +28,7 @@ GitHub also supplies the standard project source archives; explain that a
 recursive clone obtains the separately pinned engine submodule.
 
 Do not publish dependency caches as individual assets or aggregate every
-third-party source archive into a giant ZIP. Those are internal build inputs.
+third-party source archive into a giant ZIP. Those remain local build inputs; platform workflows do not upload dependency-source caches to the release assembler.
 Source references must include applied modifications and remain accessible while
 the corresponding binaries are distributed. Check links and repair/mirror any
 input that disappears; generic upstream homepages or a moving main branch do not
