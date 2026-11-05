@@ -1,7 +1,8 @@
 name: Windows WSL live preview
 on:
   push:
-    branches: [texpresso, texpresso-windows-wsl]
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

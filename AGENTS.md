@@ -1,3 +1,16 @@
+# Product and contribution repositories
+
+- The standalone product is `DominikPeters/texstudio-espresso`; `origin` points
+  there and `main` is its development/default branch. Use this repository for
+  Espresso issues, pull requests, Actions and releases.
+- `contributions` points to `DominikPeters/texstudio`, the existing GitHub fork
+  for upstream contributions. Base generic fixes on `upstream/master` and push
+  their focused branches to `contributions`.
+- `upstream` points to `texstudio-org/texstudio`. Preserve upstream attribution
+  and the shared history when integrating updates.
+- The shared engine remains the separately pinned `native/texpresso` submodule;
+  the product-repository migration does not change its repository or protocol.
+
 # Local testing and app updates
 
 - Routine verification must run in the background. Use native unit/protocol

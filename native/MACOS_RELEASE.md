@@ -1,14 +1,16 @@
 # Signed macOS builds
 
-Run **Build signed TeXpresso for macOS** in the repository's Actions tab.
+Run **Build signed TeXstudio Espresso for macOS** in the
+[product repository's Actions tab](https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso-release.yml).
 The manual input selects Apple Silicon (`arm64`, the default), Intel (`x86_64`),
-or both. The workflow always checks out `texpresso`; it does not build the
-repository's default branch or publish a GitHub Release.
+or both. Choose the product branch or tag to build in GitHub's workflow launcher;
+`main` is the default. The workflow does not publish a GitHub Release.
 
-GitHub requires a `workflow_dispatch` launcher on the default branch for the
-**Run workflow** button. `.github/workflows/texpresso-release.yml` is that small
-launcher. It calls `.github/workflows/texpresso-macos.yml@texpresso`, where build
-and signing changes are maintained alongside the application source.
+`.github/workflows/texpresso-release.yml` is the manual launcher on `main`.
+It calls `./.github/workflows/texpresso-macos.yml` at the same commit, and the
+reusable workflow checks out the selected revision. Signing credentials belong
+to `DominikPeters/texstudio-espresso`; the upstream-contribution fork remains
+separate.
 
 Each architecture builds the pinned engine, locked MuPDF/ICU profile, Poppler
 with Qt support, and TeXstudio. The application includes Qt frameworks/plugins,

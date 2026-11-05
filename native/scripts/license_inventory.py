@@ -380,7 +380,7 @@ def write_index(output, result):
             '<p>Editor source revision: <code>' + escape(result['release'].get('sourceRevision', 'unrecorded')) + '</code><br>',
             'Engine source revision: <code>' + escape(result['release'].get('engineRevision', 'unrecorded')) + '</code></p>',
             '<p>The binary download page must provide access to matching project and dependency sources. The project source ZIP contains the editor, engine, patches, build recipes and installation instructions; its SOURCE-MANIFEST.json identifies exact separately available dependency sources by URL and SHA256. ',
-            '<a href="https://github.com/DominikPeters/texstudio">Fork source repository</a> · ',
+            '<a href="https://github.com/DominikPeters/texstudio-espresso">Product source repository</a> · ',
             '<a href="https://github.com/DominikPeters/texpresso">Engine source repository</a>. ',
             'A repository branch alone may differ from this build; use the matching project source download and its dependency manifest.</p>',
             '<p>' + link('inventory.json', 'Detailed distribution inventory') + ' · ' + link('assets.json', 'Artwork/template attribution and modifications') + '</p>',

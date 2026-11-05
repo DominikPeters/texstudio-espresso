@@ -70,8 +70,8 @@ published as releases or installed on the developer's computer.
 The x64 Windows pipeline has passed real WSL2 integration and isolated portable
 startup checks. The Linux pipeline has passed the full editor build, Qt suites,
 sustained editing, and real MiKTeX cold/warm and Biber tests. See the
-[Windows workflow](https://github.com/DominikPeters/texstudio/actions/workflows/texpresso-windows.yml)
-and [Linux workflow](https://github.com/DominikPeters/texstudio/actions/workflows/texpresso.yml)
+[Windows workflow](https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso-windows.yml)
+and [Linux workflow](https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso.yml)
 for current results and artifacts. Physical trackpad gestures, compositor
 behavior, representative interactive latency and the public-release Windows
 license/source inventory remain separate checks. The engine bundles Linux

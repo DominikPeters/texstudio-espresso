@@ -1,57 +1,51 @@
-# TeXstudio with TeXpresso live preview
+# TeXstudio Espresso
 
-This fork adds an automatic native Qt preview using the same pinned TeXpresso
-engine as `DominikPeters/texpresso-vscode`. The engine is bundled with the
-application; install TeX Live for its packages. Each open project retains its
-own session and preview position when switching tabs. Normal TeXstudio build
-commands remain available for final PDFs.
+[![Live preview CI](https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso.yml/badge.svg?branch=main)](https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso.yml)
 
-Open a saved `.tex` project to start. The preview includes page navigation,
-zoom, Pause/Resume, Stop, Restart, Output, and Sync controls. Command-click on
-macOS (Ctrl-click on Linux) jumps from the preview to the source.
+**TeXstudio Espresso** adds automatic live compilation and a native Qt preview
+to [TeXstudio](https://github.com/texstudio-org/texstudio). It uses the same
+pinned [TeXpresso engine](https://github.com/DominikPeters/texpresso) as the
+[VSCode extension](https://github.com/DominikPeters/texpresso-vscode).
+The engine is bundled with the application and uses your TeX installation for
+packages. Each project retains its own session and preview position when
+switching tabs. Normal TeXstudio build commands remain available for final PDFs.
+
+Open a saved `.tex` project to start. The preview includes continuous scrolling,
+page navigation, zoom and magnification, source synchronization, hyperlinks,
+Pause/Resume, Stop, Restart and Output controls. Command-click on macOS
+(Ctrl-click on Linux) jumps from the preview to the source.
 View → Show → Live Preview enables or disables automatic preview.
+The shared toolbar switches between live preview and the compiled PDF.
 
-See [native build instructions](native/README.md) and the
-[integration design and implementation status](docs/texpresso-integration.md).
+## Builds and installation
 
+- [Native build instructions](native/README.md)
+- [macOS signed-build workflow](https://github.com/DominikPeters/texstudio-espresso/actions/workflows/texpresso-release.yml)
+  and [signing/source-distribution instructions](native/MACOS_RELEASE.md)
+- [Windows and WSL setup](native/WINDOWS.md)
+- [Background testing and validation](native/TESTING.md)
 
-[CI]: https://github.com/texstudio-org/texstudio/workflows/CI/badge.svg
-[Codacy Badge]: https://app.codacy.com/project/badge/Grade/892de515e8c54a7a99bd836743c4510c
-[Codacy TeXstudio]: https://app.codacy.com/gh/texstudio-org/texstudio/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade
+Build workflows provide artifacts in GitHub Actions. Release downloads, when
+published, are available on the [releases page](https://github.com/DominikPeters/texstudio-espresso/releases).
 
-[Website]: https://www.texstudio.org
+## Development and contributions
 
-[Download]: https://www.texstudio.org/#download
-[Releases]: https://github.com/texstudio-org/texstudio/releases/
-[News]: https://www.texstudio.org/#news
-[Contribute]: https://github.com/texstudio-org/texstudio/wiki/Contribute
-[User Manual]: https://texstudio-org.github.io/getting_started.html
-[Dev Builds]: https://github.com/texstudio-org/texstudio/actions/workflows/cd.yml
+`main` is the Espresso development branch in this standalone product repository.
+The complete TeXstudio history is retained so upstream updates can be merged.
+[CONTRIBUTING.md](CONTRIBUTING.md) describes product contributions and the separate
+[upstream-contribution fork](https://github.com/DominikPeters/texstudio).
+See the [integration design and implementation status](docs/texpresso-integration.md)
+for architectural background.
 
+## Upstream and licensing
 
-# TeXstudio
-![CI] [![Codacy Badge]][Codacy TeXstudio]
+Espresso builds on TeXstudio's editor, PDF viewer and editing tools. The
+[upstream project](https://www.texstudio.org),
+[user manual](https://texstudio-org.github.io/getting_started.html), and
+[contribution guide](https://github.com/texstudio-org/texstudio/wiki/Contribute)
+remain useful references for the shared functionality.
 
-**TeXstudio** is a fully featured **LaTeX** editor.
-
-Our goal is to make ***writing LaTeX documents as easy and comfortable*** as possible.
-
----
-#### 〔 [Download] / [Releases] / [Dev Builds] 〕〔 [News] 〕〔 [User Manual] 〕〔 [Contribute] 〕
----
-
-
-### Features
-- Advanced **Syntax Highlighting**
-- Live **Reference Checking**
-- An integrated **PDF viewer**
-- Live **Inline Preview**
-- **Latex Commands completion and syntax checking**
-- Live **Grammar checking**
-- Local and global **structure view**
-- **Citations checking and completion**
-- **Spellchecking**
-
-<br>
-
-#### Find out more at our [Website].
+TeXstudio's original authors retain their attribution and license terms.
+See [COPYING](COPYING), [distribution licensing](docs/distribution-licensing.md),
+and the generated Licenses and Source inventory for the bundled engine and
+third-party components.

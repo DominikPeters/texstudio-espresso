@@ -1,7 +1,6 @@
-# Keep this small launcher on the default branch for GitHub's Run workflow UI.
-# Build/signing implementation and application sources live on texpresso.
-name: Build signed TeXpresso for macOS
-run-name: Signed TeXpresso macOS (${{ inputs.architecture }})
+# Keep the manual launcher and reusable implementation at the same revision.
+name: Build signed TeXstudio Espresso for macOS
+run-name: Signed TeXstudio Espresso macOS (${{ inputs.architecture }})
 on:
   workflow_dispatch:
     inputs:
@@ -14,7 +13,7 @@ permissions:
   contents: read
 jobs:
   build:
-    uses: DominikPeters/texstudio/.github/workflows/texpresso-macos.yml@texpresso
+    uses: ./.github/workflows/texpresso-macos.yml
     with:
       architecture: ${{ inputs.architecture }}
     secrets: inherit

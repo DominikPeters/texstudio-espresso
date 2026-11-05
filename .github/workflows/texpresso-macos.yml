@@ -1,5 +1,5 @@
-name: Signed TeXpresso macOS app
-run-name: Signed TeXpresso macOS (${{ inputs.architecture }})
+name: Signed TeXstudio Espresso macOS app
+run-name: Signed TeXstudio Espresso macOS (${{ inputs.architecture }})
 on:
   workflow_call:
     inputs:
@@ -30,10 +30,10 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       SDL_VIDEODRIVER: dummy
     steps:
-      - name: Check out the live-preview branch
+      - name: Check out the selected product revision
         uses: actions/checkout@v7
         with:
-          ref: texpresso
+          ref: ${{ github.sha }}
           fetch-depth: 0
           submodules: true
           persist-credentials: false
