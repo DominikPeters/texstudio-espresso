@@ -55,7 +55,7 @@ public:
         if (observed.contains(session)) return;
         observed.insert(session);
         connect(&session->preview, &TexpressoPreview::command, this, [this, session](const QJsonArray &c) {
-            if (c[0] == "preview-search") {
+            if (c[0] == "preview-search" || c[0] == "preview-search-precise") {
                 auto &t = targets[session->root()];
                 t.path = TexpressoSession::identity(c[2].toString()); t.line = c[3].toInt();
             }

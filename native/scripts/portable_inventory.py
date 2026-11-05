@@ -169,7 +169,8 @@ def collect(args):
             package = binary_owner(file, args.platform)
             if package not in packages:
                 record = debian_source(package, args.apt_source_root) if args.platform == 'linux' else msys_source(package, cache, args.fetch)
-                notices = package_notices(package, output / 'notices' / package, args.platform)
+                directory = re.sub(r'[^A-Za-z0-9_.-]', '_', package)
+                notices = package_notices(package, output / 'notices' / directory, args.platform)
                 packages[package] = {**record, 'noticeFiles': [str(Path(p).relative_to(output)) for p in notices]}
                 additional += record['records']
         row = {'path': str(file.relative_to(root)), 'sha256': sha256(file), 'package': package}

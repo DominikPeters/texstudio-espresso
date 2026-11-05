@@ -1,6 +1,6 @@
 [
   {
-    "name": "TeXstudio / Texmaker and local Espresso integration",
+    "name": "TeXstudio / Texmaker and local TeXstudio Espresso integration",
     "license": "GPL-3.0 distribution baseline; inherited per-file notices remain applicable",
     "evidence": [
       "COPYING",
