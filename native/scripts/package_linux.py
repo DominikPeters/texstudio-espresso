@@ -12,6 +12,16 @@ from common import ROOT, run, sha256
 from product_release import version, version_key
 
 
+def glibc_dependencies(dependencies, required):
+    # dpkg-shlibdeps sees the editor's imports. The private engine and bundled
+    # libraries can need a newer glibc, which the package manager must enforce.
+    match = re.search(r'\blibc6 \(>= (\d+(?:\.\d+)+)[^)]*\)', dependencies)
+    if match:
+        if version_key(match[1]) >= version_key(required): return dependencies
+        return dependencies[:match.start()] + f'libc6 (>= {required})' + dependencies[match.end():]
+    return dependencies + f', libc6 (>= {required})'
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
@@ -32,6 +42,7 @@ def main():
         output = run(['readelf', '--version-info', file], capture=True)
         versions.update(re.findall(r'Name: GLIBC_(\d+(?:\.\d+)+)', output))
     required = max(versions, key=version_key)
+    dependencies = glibc_dependencies(dependencies, required)
     requirements = {'platform': 'linux', 'architecture': arch, 'minimumGlibcVersion': required,
                     'systemPackages': dependencies, 'texProvider': 'User-installed TeX Live or MiKTeX'}
     data = app / 'share/texstudio'; data.mkdir(parents=True, exist_ok=True)
@@ -45,7 +56,7 @@ def main():
     shutil.copyfile(ROOT / 'site/icon.png', icon)
     control = root / 'DEBIAN'; control.mkdir(exist_ok=True)
     (control / 'control').write_text(f'Package: texstudio-espresso\nVersion: {version()["version"]}\nSection: editors\nPriority: optional\n'
-        f'Architecture: {arch}\nMaintainer: Dominik Peters <mail@dominik-peters.de>\nDepends: {dependencies}\n'
+        f'Architecture: {arch}\nMaintainer: Dominik Peters <3543224+DominikPeters@users.noreply.github.com>\nDepends: {dependencies}\n'
         'Homepage: https://pref.tools/texstudio-espresso/\nDescription: TeXstudio Espresso LaTeX editor with live TeXpresso compilation\n'
         ' Uses a separately installed TeX Live or MiKTeX package distribution.\n')
     args.output.parent.mkdir(parents=True, exist_ok=True)

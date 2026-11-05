@@ -30,3 +30,13 @@ Load command 3
         self.assertEqual(macos_load_versions(output), ['13.0', '14.2'])
         self.assertGreater(version_key('14.0'), version_key('13.9.9'))
         self.assertEqual(version_key('14.0'), version_key('14.0.0'))
+
+
+class LinuxRuntimeFloor(unittest.TestCase):
+    def test_private_runtime_floor_cannot_exceed_package_dependencies(self):
+        from package_linux import glibc_dependencies
+        self.assertEqual(glibc_dependencies('libc6 (>= 2.38), libqt6core6t64', '2.39'),
+                         'libc6 (>= 2.39), libqt6core6t64')
+        newer = 'libc6 (>= 2.39-0ubuntu8.6), libqt6core6t64'
+        self.assertEqual(glibc_dependencies(newer, '2.38'), newer)
+        self.assertEqual(glibc_dependencies(newer, '2.39'), newer)

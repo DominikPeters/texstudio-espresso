@@ -160,7 +160,7 @@ def source_notices(source_record, cache, output):
         names = subprocess.check_output([tool, '-tf', str(file)], text=True).splitlines()
         for name in names:
             relative = Path(name)
-            if relative.is_absolute() or '..' in relative.parts:
+            if relative.is_absolute() or relative.drive or '..' in relative.parts:
                 raise ValueError('Unsafe source archive member: ' + name)
             if name.endswith('/'): continue
             notice = re.match(r'(?i)^(licen[cs]e|copying|copyright|notice|authors)', relative.name)
