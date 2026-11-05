@@ -147,8 +147,11 @@ def package_notices(package, output, platform):
         paths = []
         for line in run(['pacman', '-Ql', package], capture=True).splitlines():
             value = line.split(' ', 1)[1]
+            # Qt packages list thousands of headers/plugins. Convert only the
+            # notice paths: cygpath is a separate native process on Windows.
+            if '/share/licenses/' not in value: continue
             path = host_path(value)
-            if path.is_file() and '/share/licenses/' in value: paths.append(path)
+            if path.is_file(): paths.append(path)
     if not paths:
         raise ValueError('Missing installed license notices for ' + package)
     output.mkdir(parents=True)
@@ -211,6 +214,7 @@ def collect(args):
         if is_dll or '.so' in file.name:
             package = binary_owner(file, args.platform)
             if package not in packages:
+                print('Collecting exact source and notices:', package, flush=True)
                 record = debian_source(package, args.apt_source_root, cache, args.fetch) if args.platform == 'linux' else msys_source(package, cache, args.fetch)
                 directory = re.sub(r'[^A-Za-z0-9_.-]', '_', package)
                 notices = package_notices(package, output / 'notices' / directory, args.platform)

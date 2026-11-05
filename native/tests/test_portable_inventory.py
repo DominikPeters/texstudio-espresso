@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source
+from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source, package_notices
 import subprocess
 import tempfile
 
@@ -62,3 +62,12 @@ class PortableInventory(unittest.TestCase):
             (cache / 'example_2.1-4.dsc').write_text('Source: example\nVersion: 2.1-3\n')
             with self.assertRaisesRegex(ValueError, 'identity differs'):
                 archived_ubuntu_source('example', '2.1-4', cache)
+
+    def test_windows_notice_collection_converts_only_license_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); notice = root / 'LICENSE'; notice.write_text('original notice')
+            listing = 'qt /ucrt64/include/QtCore/header.h\nqt /ucrt64/bin/Qt6Core.dll\nqt /ucrt64/share/licenses/qt6-base/LICENSE\n'
+            with patch('portable_inventory.run', return_value=listing), patch('portable_inventory.host_path', return_value=notice) as convert:
+                result = package_notices('qt', root / 'notices', 'windows')
+            convert.assert_called_once_with('/ucrt64/share/licenses/qt6-base/LICENSE')
+            self.assertEqual(Path(result[0]).read_text(), 'original notice')
