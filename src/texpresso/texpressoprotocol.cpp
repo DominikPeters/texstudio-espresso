@@ -64,14 +64,21 @@ bool TexpressoProtocol::validImage(const QJsonObject &h)
         if (!count(h.value(QLatin1String(key)))) return false;
     const qint64 w = h["width"].toInt(), height = h["height"].toInt();
     if (!w || !height || w > 8192 || height > 8192 || w * height > maxPixels
-        || h["byteLength"].toInt() > (h["mime"] == "image/png" ? maxPngBytes : 16 * 1024 * 1024)) return false;
-    if (h["mime"] != "image/png" && h["mime"] != "image/svg+xml") return false;
+        || h["byteLength"].toInt() > maxPngBytes) return false;
+    if (h["mime"] != "image/png") return false;
     if (h.contains("rasterId") && (!count(h["rasterId"]) || h["rasterId"].toInt() < 1)) return false;
     const auto bounds = h["bounds"].toArray();
     if (bounds.size() != 4) return false;
     for (const auto &v : bounds)
         if (!v.isDouble() || !std::isfinite(v.toDouble()) || std::abs(v.toDouble()) >= 1e9) return false;
     if (bounds[2].toDouble() <= bounds[0].toDouble() || bounds[3].toDouble() <= bounds[1].toDouble()) return false;
+    const auto grid = h["grid"].toArray(), clip = h["clip"].toArray();
+    if (grid.size() != 2 || clip.size() != 4 || h["mime"] != "image/png" || !h.contains("rasterId")) return false;
+    for (const auto &v : grid) if (!count(v)) return false;
+    for (const auto &v : clip) if (!count(v)) return false;
+    if (grid[0].toInt() < 1 || grid[0].toInt() > 65536 || grid[1].toInt() < 1 || grid[1].toInt() > 1048576
+        || clip[2].toInt() > grid[0].toInt() || clip[3].toInt() > grid[1].toInt()
+        || clip[2].toInt() - clip[0].toInt() != w || clip[3].toInt() - clip[1].toInt() != height) return false;
     if (h.contains("patch")) {
         const auto patch = h["patch"].toObject();
         const auto rect = patch["rect"].toArray();

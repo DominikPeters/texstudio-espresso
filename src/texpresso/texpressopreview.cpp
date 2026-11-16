@@ -67,7 +67,7 @@ bool TexpressoPreview::busy() const
 {
     if (!active) return false;
     if (findingEnd || endRevealPending || sourceTarget || destination || gestureActive || (inFlight && (!renderingBackground || visiblePages.contains(flightPage))) || dirty || pendingRegion || pendingInverse || waitingForward) return true;
-    for (int page : visiblePages) if (!pageValid(page) && !prefetched.contains(page)) return true;
+    for (int page : visiblePages) if (!surfaceReady(page) && !prefetched.contains(page)) return true;
     return false;
 }
 void TexpressoPreview::setPreparationPending(bool value)
@@ -86,7 +86,7 @@ void TexpressoPreview::interruptBackground()
 QImage TexpressoPreview::pageImage(int page) const
 {
     if (page == currentPage && fresh) return pixels;
-    for (const auto &cached : pages) if (cached.page == page && cached.width == pixelWidth) return cached.image;
+    for (const auto &cached : pages) if (cached.page == page) return cached.image;
     // The retained foreground frame can outlive its cache entry, but it still
     // belongs to the page that produced it, even after selection moves ahead.
     return page == displayedPage ? pixels : QImage();
@@ -101,7 +101,7 @@ QRectF TexpressoPreview::boundsForPage(int page) const
 bool TexpressoPreview::pageValid(int page) const
 {
     if (page == currentPage && fresh) return true;
-    for (const auto &cached : pages) if (cached.page == page && cached.width == pixelWidth) return true;
+    for (const auto &cached : pages) if (cached.page == page) return true;
     return false;
 }
 QRectF TexpressoPreview::horizontalTextRange() const
@@ -129,7 +129,7 @@ QJsonObject TexpressoPreview::annotationsForPage(int page) const
 {
     if (!supportsLinks || !pageValid(page)) return {};
     if (page == currentPage && fresh) return pageAnnotations;
-    for (const auto &cached : pages) if (cached.page == page && cached.width == pixelWidth) return cached.annotations;
+    for (const auto &cached : pages) if (cached.page == page) return cached.annotations;
     return {};
 }
 void TexpressoPreview::activateLink(int page, int index, qint64 revision, qint64 sequence)
@@ -178,6 +178,76 @@ void TexpressoPreview::finishDestination()
     cancelDestination();
     emit failed(tr("This link target has no position in the rendered page."));
 }
+TexpressoSurface TexpressoPreview::surfaceForPage(int page) const
+{
+    if (page == currentPage && fresh) return pixelSurface;
+    for (const auto &cached : pages) if (cached.page == page) return cached.surface;
+    return page == displayedPage ? pixelSurface : TexpressoSurface{};
+}
+TexpressoSurface TexpressoPreview::wantedSurface(int page, bool overscan) const
+{
+    const auto bounds = boundsForPage(page);
+    const auto viewport = viewports.constFind(page);
+    int width = pixelWidth;
+    if (!viewports.isEmpty()) {
+        auto reference = viewports.constFind(currentPage);
+        if (reference == viewports.cend()) reference = viewports.cbegin();
+        width = std::clamp(qRound(reference->width * bounds.width() / boundsForPage(reference->page).width()), 1, 65536);
+    }
+    TexpressoSurface surface;
+    if (viewport != viewports.cend()) surface = TexpressoSurface::plan(viewport->width, bounds, viewport->visible, overscan);
+    else if (!viewports.isEmpty()) {
+        auto reference = viewports.constFind(currentPage);
+        if (reference == viewports.cend()) reference = viewports.cbegin();
+        const auto grid = TexpressoSurface::pageGrid(width, bounds);
+        const int top = page < reference->page ? std::max(0, grid.height() - reference->visible.height()) : 0;
+        // Prefetch at the same density and horizontal scroll position, using
+        // only a viewport-sized strip at the approaching page boundary.
+        surface = TexpressoSurface::plan(width, bounds, QRect(reference->visible.x(), top,
+            reference->visible.width(), reference->visible.height()), overscan);
+    } else surface = TexpressoSurface::plan(width, bounds);
+    bool known = page == displayedPage && !pageBounds.isEmpty();
+    for (const auto &cached : pages) if (cached.page == page) known = true;
+    if (!known && viewports.isEmpty()) {
+        // Before the first frame the page's aspect ratio is unknown. Ask for
+        // a bounded top-left rectangle and let the engine clip to the actual
+        // page, rather than accidentally omitting its last rows.
+        const int columns = std::min(width, 8192);
+        surface.clip = QRect(0, 0, columns, std::min(8192, int(TexpressoProtocol::maxPixels / columns)));
+    }
+    return surface;
+}
+bool TexpressoPreview::surfaceReady(int page) const
+{
+    return pageValid(page) && surfaceForPage(page).covers(wantedSurface(page, false));
+}
+void TexpressoPreview::setViewport(const QList<Viewport> &viewport, bool gesture)
+{
+    QHash<int, Viewport> next;
+    QList<int> visible;
+    for (const auto &v : viewport) {
+        if (v.page < 0 || v.page > 100000 || v.width < 1 || v.width > 65536 || v.visible.isEmpty() || next.size() >= 16) continue;
+        next.insert(v.page, v); visible.append(v.page);
+    }
+    viewports = next;
+    // Cancel obsolete geometry before it can replace a newer-density image.
+    if (inFlight && !renderingRegion && flightPage != 100000 && !flightSurface.covers(wantedSurface(flightPage, false))) {
+        emit command({"preview-cancel", double(inFlight), currentPage});
+        prefetched.remove(flightPage); inFlight = 0; pending.reset();
+    }
+    if (!surfaceReady(currentPage)) dirty = true;
+    for (int page : visible) if (!surfaceReady(page)) prefetched.remove(page);
+    setViewportPages(visible, gesture);
+    request();
+}
+void TexpressoPreview::sendSurface(int page, const TexpressoSurface &surface, bool background, qint64 base)
+{
+    flightPage = page; flightSurface = surface;
+    flightBase = base; inFlight = ++nextRequest;
+    const auto c = surface.clip;
+    emit command({"preview-surface", double(inFlight), page, surface.grid.width(), double(engineRevision), double(sourceSequence),
+        c.x(), c.y(), c.x() + c.width(), c.y() + c.height(), 0, 0, double(base), background ? 1 : 0});
+}
 void TexpressoPreview::setViewportPages(const QList<int> &visible, bool gesture)
 {
     QList<int> next;
@@ -204,7 +274,7 @@ void TexpressoPreview::setViewportPages(const QList<int> &visible, bool gesture)
 }
 void TexpressoPreview::schedulePrefetch()
 {
-    if (active && supportsBackground && !gestureActive && !preparationPending && !visiblePages.isEmpty()
+    if (active && !gestureActive && !preparationPending && !visiblePages.isEmpty()
         && !prefetchReady && !prefetchTimer.isActive() && !busy()) prefetchTimer.start();
 }
 void TexpressoPreview::setCapabilities(const QJsonObject &capabilities)
@@ -212,22 +282,17 @@ void TexpressoPreview::setCapabilities(const QJsonObject &capabilities)
     supportsPreciseSync = capabilities["synctexPrecision"].toInt() == 1;
     supportsLinks = capabilities["links"].toBool();
     if (!supportsLinks) cancelDestination();
-    supportsBackground = capabilities["backgroundRendering"].toBool();
-    supportsRegions = capabilities["regions"].toBool();
-    supportsPatches = capabilities["pngPatches"].toBool();
     supportsRequestLifecycle = capabilities["requestLifecycle"].toBool() || supportsPreciseSync;
-    if (!supportsRegions) cancelRegion();
-    if (!supportsPatches) rasterId = 0;
 }
 void TexpressoPreview::requestRegion(const QRectF &bounds, int width, qint64 token)
 {
-    if (!supportsRegions || !active || !fresh || bounds.isEmpty() || width < 1) return;
+    if (!active || !fresh || bounds.isEmpty() || width < 1) return;
     const auto clipped = bounds.intersected(pageBounds);
     if (clipped.isEmpty() || !std::isfinite(clipped.x()) || !std::isfinite(clipped.y())
         || !std::isfinite(clipped.width()) || !std::isfinite(clipped.height())) return;
     emit interactionStarted(); interruptBackground();
     regionToken = token;
-    pendingRegion = Region{clipped, std::clamp(width, 1, 4096), token};
+    pendingRegion = Region{clipped, std::clamp(width, 1, 8192), token};
     request();
 }
 void TexpressoPreview::cancelRegion()
@@ -281,7 +346,7 @@ void TexpressoPreview::setPage(int page)
 }
 void TexpressoPreview::setWidth(int width)
 {
-    width = std::clamp(width, 1, 4096);
+    width = std::clamp(width, 1, 65536);
     if (width == pixelWidth) return;
     emit interactionStarted(); interruptBackground();
     pixelWidth = width; prefetched.clear(); dirty = true; inFlight = 0;
@@ -454,36 +519,37 @@ void TexpressoPreview::request()
     if (destination && destination->page < 0) { emit activityChanged(); return; }
     if (dirty && !pendingInverse) restorePage();
     finishDestination(); finishForward(); finishEndNavigation();
-    renderingBackground = false; flightPage = currentPage; flightWidth = pixelWidth;
+    renderingBackground = false; flightPage = currentPage;
     if (findingEnd && !finished) {
         // A background request beyond the supported page range drives the
         // existing engine to EOF without selecting a fictitious foreground
         // page or allocating any geometry for it. EOF supplies the real count.
         renderingBackground = true; renderingRegion = false; flightPage = 100000;
-        inFlight = ++nextRequest;
-        emit command({"preview-background", double(inFlight), flightPage, pixelWidth, double(engineRevision), double(sourceSequence), 0, 0});
+        sendSurface(flightPage, TexpressoSurface::plan(1, boundsForPage(currentPage), QRect(0, 0, 1, 1)), true);
     } else if (dirty) {
         emit interactionStarted();
-        inFlight = ++nextRequest; dirty = false; renderingRegion = false;
-        if (supportsPatches)
-            emit command({"preview-png", double(inFlight), currentPage, pixelWidth, double(engineRevision), double(sourceSequence), double(rasterId)});
-        else emit command({"preview-render", double(inFlight), currentPage, pixelWidth, double(engineRevision), double(sourceSequence)});
+        dirty = false; renderingRegion = false;
+        const auto surface = wantedSurface(currentPage);
+        const auto base = !forceKeyframe && rasterPage == currentPage && pixelSurface == surface ? rasterId : 0;
+        forceKeyframe = false;
+        sendSurface(currentPage, surface, false, base);
     } else if (pendingRegion && fresh) {
         const auto region = *pendingRegion; pendingRegion.reset();
-        inFlight = ++nextRequest; renderingRegion = true; flightRegionToken = region.token;
-        const auto b = region.bounds;
-        emit command({"preview-region", double(inFlight), currentPage, region.width, double(engineRevision), double(sourceSequence),
-            b.left(), b.top(), b.right(), b.bottom()});
-    } else if (supportsBackground && !preparationPending && !destination && !followingSource()) {
+        renderingRegion = true; flightRegionToken = region.token;
+        const int width = std::clamp(qRound(region.width * pageBounds.width() / region.bounds.width()), 1, 65536);
+        const double scale = width / pageBounds.width();
+        const QRect clip = QRectF((region.bounds.topLeft() - pageBounds.topLeft()) * scale, region.bounds.size() * scale).toAlignedRect();
+        sendSurface(currentPage, TexpressoSurface::plan(width, pageBounds, clip, false), false);
+    } else if (!preparationPending && !destination && !followingSource()) {
         int target = -1;
         // Visible pages precede speculative neighbors. Never let an idle
         // frontier request recursively compile the entire document.
-        for (int page : visiblePages) if (!pageValid(page) && !prefetched.contains(page)) { target = page; break; }
+        for (int page : visiblePages) if (!surfaceReady(page) && !prefetched.contains(page)) { target = page; break; }
         if (target < 0 && prefetchReady && !gestureActive && !visiblePages.isEmpty()) {
             const int first = *std::min_element(visiblePages.begin(), visiblePages.end());
             const int last = *std::max_element(visiblePages.begin(), visiblePages.end());
             for (int page : {last + 1, first - 1}) {
-                if (page < 0 || (!canDiscoverPages() && page >= count) || page > count || pageValid(page) || prefetched.contains(page)) continue;
+                if (page < 0 || (!canDiscoverPages() && page >= count) || page > count || surfaceReady(page) || prefetched.contains(page)) continue;
                 if (page >= count) { if (!frontierBudget) continue; --frontierBudget; }
                 target = page; prefetched.insert(page); break;
             }
@@ -492,8 +558,12 @@ void TexpressoPreview::request()
             if (visiblePages.contains(target)) emit interactionStarted();
             prefetched.insert(target);
             renderingBackground = true; renderingRegion = false; flightPage = target;
-            inFlight = ++nextRequest;
-            emit command({"preview-background", double(inFlight), target, pixelWidth, double(engineRevision), double(sourceSequence), 0, 0});
+            const auto surface = wantedSurface(target);
+            qint64 base = 0;
+            if (!forceKeyframe) for (const auto &cached : pages)
+                if (cached.page == target && cached.surface == surface) base = cached.rasterId;
+            forceKeyframe = false;
+            sendSurface(target, surface, true, base);
         }
     }
     emit activityChanged();
@@ -510,15 +580,20 @@ void TexpressoPreview::receive(const QJsonObject &header, const QByteArray &byte
     if (!TexpressoProtocol::validImage(header) || header["byteLength"].toInt() != bytes.size()) {
         inFlight = 0; emit failed(tr("Invalid TeXpresso preview image.")); return;
     }
+    const auto surface = TexpressoSurface::fromHeader(header);
+    if (surface.grid.width() != flightSurface.grid.width() || !flightSurface.clip.contains(surface.clip)
+        || surface.grid != TexpressoSurface::pageGrid(surface.grid.width(), frameBounds(header))) {
+        inFlight = 0; emit failed(tr("Invalid TeXpresso surface geometry.")); return;
+    }
     QImage base;
     if (header.contains("patch")) {
-        const auto patch = header["patch"].toObject();
-        if (renderingRegion || !supportsPatches || !rasterId || patch["base"].toDouble() != rasterId
-            || rasterPage != currentPage || QSize(header["width"].toInt(), header["height"].toInt()) != rasterSize
-            || frameBounds(header) != rasterBounds || pixels.size() != rasterSize) {
+        if (renderingRegion || !flightBase || header["patch"].toObject()["base"].toDouble() != flightBase) {
             retryFullFrame(); return;
         }
-        base = pixels;
+        if (rasterId == flightBase && rasterPage == flightPage && pixelSurface == surface && pageBounds == frameBounds(header)) base = pixels;
+        else for (const auto &cached : pages)
+            if (cached.page == flightPage && cached.rasterId == flightBase && cached.surface == surface && cached.bounds == frameBounds(header)) base = cached.image;
+        if (base.size() != surface.clip.size()) { retryFullFrame(); return; }
     }
     Frame frame{header, bytes, base, renderingRegion, flightRegionToken, renderingBackground};
     if (decoding) pending = std::move(frame); else decode(std::move(frame));
@@ -534,9 +609,10 @@ void TexpressoPreview::decode(Frame frame)
             if (region) {
                 // A lens result must never replace the page or its patch base.
                 if (!image.isNull() && token == regionToken && active && fresh)
-                    emit regionReady(token, image, frameBounds(header));
+                    emit regionReady(token, image, TexpressoSurface::fromHeader(header).pageRect(frameBounds(header)));
             } else if (background) {
-                if (!image.isNull()) { rememberTextBounds(header); storePage(header["page"].toInt(), flightWidth, image, frameBounds(header), header["annotations"].toObject()); emit updated(); }
+                if (image.isNull() && header.contains("patch")) retryFullFrame();
+                else if (!image.isNull()) { rememberTextBounds(header); storePage(header["page"].toInt(), image, frameBounds(header), header["annotations"].toObject(), TexpressoSurface::fromHeader(header), qint64(header["rasterId"].toDouble())); emit updated(); }
             } else if (image.isNull() && header.contains("patch")) retryFullFrame();
             else if (image.isNull()) emit failed(tr("Cannot decode TeXpresso preview image."));
             else {
@@ -544,8 +620,9 @@ void TexpressoPreview::decode(Frame frame)
                 pageBounds = frameBounds(header);
                 pageAnnotations = header["annotations"].toObject();
                 rememberTextBounds(header);
-                rasterId = supportsPatches ? qint64(header["rasterId"].toDouble()) : 0;
-                rasterPage = currentPage; rasterBounds = pageBounds; rasterSize = pixels.size();
+                rasterId = qint64(header["rasterId"].toDouble());
+                pixelSurface = TexpressoSurface::fromHeader(header);
+                rasterPage = currentPage;
                 needsNativePage = false; fresh = true; cachePage();
                 finishInverse(); emit updated(); finishDestination(); finishForward(); finishEndNavigation();
             }
@@ -579,10 +656,13 @@ void TexpressoPreview::decode(Frame frame)
 }
 void TexpressoPreview::retryFullFrame()
 {
-    rasterId = 0; inFlight = 0; dirty = true; fresh = false; pending.reset();
-    // Bypass a cached page: it cannot repair the engine's rejected base.
-    const auto inverse = pendingInverse;
-    clearCache(); pendingInverse = inverse; emit updated(); request();
+    forceKeyframe = true; inFlight = 0; pending.reset();
+    for (int i = pages.size() - 1; i >= 0; --i) if (pages[i].page == flightPage) {
+        cacheBytes -= pages[i].image.sizeInBytes(); pages.removeAt(i);
+    }
+    if (renderingBackground) prefetched.remove(flightPage);
+    else { rasterId = 0; dirty = true; fresh = false; }
+    emit updated(); request();
 }
 void TexpressoPreview::inverse(const QPointF &point, bool activate, bool allowPreparation, int page)
 {
@@ -626,9 +706,9 @@ void TexpressoPreview::releaseCache()
 }
 void TexpressoPreview::cachePage()
 {
-    storePage(currentPage, pixelWidth, pixels, pageBounds, pageAnnotations);
+    storePage(currentPage, pixels, pageBounds, pageAnnotations, pixelSurface, rasterId);
 }
-void TexpressoPreview::storePage(int page, int width, const QImage &image, const QRectF &bounds, const QJsonObject &annotations)
+void TexpressoPreview::storePage(int page, const QImage &image, const QRectF &bounds, const QJsonObject &annotations, const TexpressoSurface &surface, qint64 raster)
 {
     if (!active) return;
     // Preserve two ordinary Retina pages when possible. Large zooms can keep
@@ -636,7 +716,7 @@ void TexpressoPreview::storePage(int page, int width, const QImage &image, const
     // retained decoded images exceed 64 MiB per active session.
     const qint64 budget = std::clamp(qint64(image.sizeInBytes()) * 2, qint64(32 * 1024 * 1024), qint64(64 * 1024 * 1024));
     for (int i = pages.size() - 1; i >= 0; --i) {
-        if (pages[i].page == page && pages[i].width == width) {
+        if (pages[i].page == page) {
             cacheBytes -= pages[i].image.sizeInBytes(); pages.removeAt(i);
         }
     }
@@ -650,16 +730,16 @@ void TexpressoPreview::storePage(int page, int width, const QImage &image, const
         if (victim < 0) { if (!visiblePages.contains(page)) return; victim = 0; }
         cacheBytes -= pages[victim].image.sizeInBytes(); pages.removeAt(victim);
     }
-    pages.append({page, width, image, bounds, annotations}); cacheBytes += bytes;
+    pages.append({page, image, bounds, annotations, surface, raster}); cacheBytes += bytes;
 }
 bool TexpressoPreview::restorePage()
 {
     for (int i = 0; i < pages.size(); ++i) {
-        if (pages[i].page != currentPage || pages[i].width != pixelWidth) continue;
+        if (pages[i].page != currentPage || forceKeyframe || !pages[i].surface.covers(wantedSurface(currentPage, false))) continue;
         const auto cached = pages.takeAt(i); pages.append(cached);
         pixels = cached.image; displayedPage = currentPage; pageBounds = cached.bounds;
         pageAnnotations = cached.annotations;
-        rasterId = 0;
+        rasterId = cached.rasterId; rasterPage = currentPage; pixelSurface = cached.surface;
         dirty = false; fresh = true; needsNativePage = true;
         emit updated(); return true;
     }

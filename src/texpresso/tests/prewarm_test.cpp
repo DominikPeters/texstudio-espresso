@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressoprewarm.h"
 #include "texpressosession.h"
 #include <QFile>
@@ -236,7 +237,7 @@ void TexpressoPrewarmTest::inverseCursorDoesNotPrepareOrSearchAgain()
     const auto request = sent(commands);
     QImage image(8, 8, QImage::Format_RGB32); image.fill(Qt::white);
     QByteArray png; QBuffer buffer(&png); buffer.open(QIODevice::WriteOnly); image.save(&buffer, "PNG");
-    live.preview.receive({{"requestId", request[1]}, {"revision", 1}, {"sequence", 0}, {"page", 0},
+    receiveTestSurface(live.preview, request, {{"requestId", request[1]}, {"revision", 1}, {"sequence", 0}, {"page", 0},
         {"bounds", QJsonArray{0, 0, 600, 800}}, {"width", 8}, {"height", 8}, {"mime", "image/png"}, {"byteLength", png.size()}}, png);
     QTRY_VERIFY(live.preview.valid()); commands.clear();
     connect(&live, &TexpressoSession::sourceLocation, &live, [&](const QString &path, int line) {
@@ -262,7 +263,7 @@ void TexpressoPrewarmTest::failedPaginationCancelsPrewarming()
     const auto request = sent(commands);
     QImage image(8, 8, QImage::Format_RGB32); image.fill(Qt::white);
     QByteArray png; QBuffer buffer(&png); buffer.open(QIODevice::WriteOnly); image.save(&buffer, "PNG");
-    live.preview.receive({{"requestId", request[1]}, {"revision", 1}, {"sequence", 0}, {"page", 0},
+    receiveTestSurface(live.preview, request, {{"requestId", request[1]}, {"revision", 1}, {"sequence", 0}, {"page", 0},
         {"bounds", QJsonArray{0, 0, 600, 800}}, {"width", 8}, {"height", 8}, {"mime", "image/png"}, {"byteLength", png.size()}}, png);
     QTRY_VERIFY(live.preview.valid());
     live.prepareEdit(root, 1, 0); QVERIFY(live.prewarm.pending());

@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
         widget.resize(800, 1000); widget.show(); manager.activate(root);
         auto session = manager.current();
         int renders = 0;
-        QObject::connect(&session->preview, &TexpressoPreview::command, [&](const QJsonArray &c) { if (c[0] == "preview-render") ++renders; });
+        QObject::connect(&session->preview, &TexpressoPreview::command, [&](const QJsonArray &c) { if (c[0] == "preview-surface") ++renders; });
         if (!waitFor([&] { return session->preview.valid() || session->failed(); }) || session->failed()) return 2;
         // Settle initial viewport sizing, then prime both pages at that width.
         QElapsedTimer settle; settle.start(); while (settle.elapsed() < 250) { QCoreApplication::processEvents(); QThread::msleep(1); }

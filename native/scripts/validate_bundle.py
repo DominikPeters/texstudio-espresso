@@ -18,8 +18,8 @@ def validate(bundle, revision, system, architecture, windows_wsl=False):
     if manifest.get('platform') != system or actual != expected:
         raise ValueError('Bundle platform/architecture does not match the application target')
     capabilities = manifest.get('capabilities', {})
-    if capabilities.get('previewProtocol') != 1 or 'png' not in capabilities.get('codecs', []):
-        raise ValueError('Bundle requires headless preview protocol 1 with PNG')
+    if capabilities.get('previewProtocol') != 1 or 'png' not in capabilities.get('codecs', []) or capabilities.get('surfaces') != 1:
+        raise ValueError('Bundle requires headless preview protocol 1 with display-density PNG surfaces')
     files = manifest.get('files', [])
     names = set()
     for entry in files:

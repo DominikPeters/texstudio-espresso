@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressoprotocol.h"
 #include "texpressomanager.h"
 #include "texpressowidget.h"
@@ -32,7 +33,7 @@ private slots:
 static QJsonObject header(int bytes) {
     return {{"requestId", 1}, {"revision", 2}, {"sequence", 3}, {"page", 0},
         {"bounds", QJsonArray{0, 0, 612, 792}}, {"width", 1200}, {"height", 1553},
-        {"mime", "image/png"}, {"byteLength", bytes}};
+        {"grid", QJsonArray{1200, 1553}}, {"clip", QJsonArray{0, 0, 1200, 1553}}, {"rasterId", 1}, {"mime", "image/png"}, {"byteLength", bytes}};
 }
 void ClientTest::fragmentedBinary()
 {
@@ -59,13 +60,22 @@ void ClientTest::invalidDimensions()
     QVERIFY(!TexpressoProtocol::validImage(h));
     h = header(100); h["width"] = -1; QVERIFY(!TexpressoProtocol::validImage(h));
     h = header(0); QVERIFY(!TexpressoProtocol::validImage(h));
-    h = header(100); h["width"] = 2240; h["height"] = 3168;
+    h = header(100); h["width"] = 2240; h["height"] = 3168; h["grid"] = QJsonArray{2240, 3168}; h["clip"] = QJsonArray{0, 0, 2240, 3168};
     QVERIFY(TexpressoProtocol::validImage(h));
-    h["width"] = 4000; h["height"] = 4000; h["byteLength"] = 64 * 1024 * 1024;
+    h["width"] = 4000; h["height"] = 4000; h["grid"] = QJsonArray{4000, 4000}; h["clip"] = QJsonArray{0, 0, 4000, 4000}; h["byteLength"] = 64 * 1024 * 1024;
     QVERIFY(TexpressoProtocol::validImage(h));
     h["height"] = 4001; QVERIFY(!TexpressoProtocol::validImage(h));
     h["height"] = 4000; h["byteLength"] = 64 * 1024 * 1024 + 1;
     QVERIFY(!TexpressoProtocol::validImage(h));
+    for (const auto &pair : QList<QPair<QString, QJsonValue>>{
+        {"grid", QJsonArray{65537, 1553}}, {"grid", QJsonArray{1200, 1048577}},
+        {"grid", QJsonArray{1200}}, {"clip", QJsonArray{0, 0, 1201, 1553}},
+        {"clip", QJsonArray{-1, 0, 1199, 1553}}, {"clip", QJsonArray{0.5, 0, 1200, 1553}},
+        {"clip", QJsonArray{0, 0, 1200}}, {"rasterId", 0}}) {
+        auto invalid = header(100); invalid[pair.first] = pair.second;
+        QVERIFY(!TexpressoProtocol::validImage(invalid));
+    }
+    h = header(100); h.remove("grid"); QVERIFY(!TexpressoProtocol::validImage(h));
     h = header(100); h["textBounds"] = QJsonArray{50, 20, 560, 700};
     QVERIFY(TexpressoProtocol::validImage(h));
     for (const auto &text : {QJsonArray{50, 20, 50, 700}, QJsonArray{1, 2, 3}, QJsonArray{"x", 0, 5, 6}}) {
@@ -83,18 +93,18 @@ void ClientTest::emptyPatchFrame()
 }
 void ClientTest::obsoleteDecode()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(2); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setActive(true); preview.sourceChanged(3);
     preview.message({"preview-state", 2, 3, 1, true, 0});
-    QImage red(2, 2, QImage::Format_RGB32); red.fill(Qt::red);
+    QImage red(2, 3, QImage::Format_RGB32); red.fill(Qt::red);
     QByteArray bytes; QBuffer output(&bytes); output.open(QIODevice::WriteOnly); QVERIFY(red.save(&output, "PNG"));
-    auto h = header(bytes.size()); h["width"] = 2; h["height"] = 2;
-    preview.receive(h, bytes); // Decoding happens on another thread.
+    auto h = header(bytes.size()); h["width"] = 2; h["height"] = 3;
+    receiveTestSurface(preview, commands.last()[0].toJsonArray(), h, bytes); // Decoding happens on another thread.
     preview.sourceChanged(4);
     QTest::qWait(50); QVERIFY(!preview.valid()); QVERIFY(preview.image().isNull());
     preview.message({"preview-state", 3, 4, 1, true, 0});
     h["requestId"] = commands.last()[0].toJsonArray()[1]; h["revision"] = 3; h["sequence"] = 4;
-    preview.receive(h, bytes); QTRY_VERIFY(preview.valid()); QCOMPARE(preview.image(), red);
+    receiveTestSurface(preview, commands.last()[0].toJsonArray(), h, bytes); QTRY_VERIFY(preview.valid()); QCOMPARE(preview.image().pixelColor(0, 0), QColor(Qt::red));
 }
 static QJsonObject imageFrame(TexpressoPreview &preview, const QJsonArray &request, const QImage &image)
 {
@@ -102,13 +112,14 @@ static QJsonObject imageFrame(TexpressoPreview &preview, const QJsonArray &reque
     auto h = header(bytes.size()); h["requestId"] = request[1]; h["page"] = request[2];
     h["width"] = image.width(); h["height"] = image.height();
     h["revision"] = double(preview.revision()); h["sequence"] = double(preview.sequence());
-    preview.receive(h, bytes); return h;
+    h["bounds"] = QJsonArray{0, 0, image.width(), image.height()};
+    receiveTestSurface(preview, request, h, bytes); return h;
 }
 void ClientTest::pageCache()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(2); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setActive(true); preview.sourceChanged(3); preview.message({"preview-state", 2, 3, 2, true, 0});
-    QImage red(2, 2, QImage::Format_RGB32); red.fill(Qt::red);
+    QImage red(2, 3, QImage::Format_RGB32); red.fill(Qt::red);
     imageFrame(preview, commands.last()[0].toJsonArray(), red); QTRY_VERIFY(preview.valid());
     preview.setPage(1); QImage blue = red; blue.fill(Qt::blue);
     imageFrame(preview, commands.last()[0].toJsonArray(), blue); QTRY_VERIFY(preview.valid());
@@ -122,16 +133,17 @@ void ClientTest::pageCache()
     QCOMPARE(commands.last()[0].toJsonArray()[3].toInt(), 1);
     preview.setPage(0);
     preview.sourceChanged(4); QVERIFY(!preview.valid()); preview.message({"preview-state", 3, 4, 2, true, 0});
-    QCOMPARE(commands.last()[0].toJsonArray()[0].toString(), QString("preview-render"));
+    QCOMPARE(commands.last()[0].toJsonArray()[0].toString(), QString("preview-surface"));
     QVERIFY(!preview.valid()); // no reuse across source revisions
     imageFrame(preview, commands.last()[0].toJsonArray(), blue); QTRY_VERIFY(preview.valid());
     preview.setWidth(600);
     imageFrame(preview, commands.last()[0].toJsonArray(), red);
-    QTRY_COMPARE(preview.image(), red);
-    const int resized = commands.size(); preview.setWidth(1200);
-    QVERIFY(preview.valid()); QCOMPARE(preview.image(), blue); QCOMPARE(commands.size(), resized);
+    QTRY_COMPARE(preview.image().pixelColor(0, 0), QColor(Qt::red));
+    const int resized = commands.size(); preview.setWidth(2);
+    QCOMPARE(commands.size(), resized + 1);
+    imageFrame(preview, commands.last()[0].toJsonArray(), blue); QTRY_VERIFY(preview.valid());
     preview.message({"preview-invalidated", 4, 4}); QVERIFY(!preview.valid());
-    QCOMPARE(commands.last()[0].toJsonArray()[0].toString(), QString("preview-render"));
+    QCOMPARE(commands.last()[0].toJsonArray()[0].toString(), QString("preview-surface"));
 }
 void ClientTest::cacheEviction_data()
 {
@@ -144,7 +156,7 @@ void ClientTest::cacheEviction_data()
 void ClientTest::cacheEviction()
 {
     QFETCH(QSize, size); QFETCH(int, count);
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(size.width()); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setActive(true); preview.message({"preview-state", 1, 0, count, true, 0});
     QImage image(size, QImage::Format_RGB32); image.fill(Qt::red);
     for (int i = 0; i < count; ++i) {

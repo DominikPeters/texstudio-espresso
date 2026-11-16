@@ -19,6 +19,10 @@ public:
     explicit TexpressoCanvas(PDFDocumentConfig *config, QScrollArea *area);
     QImage pixels;
     QRectF pageBounds;
+    TexpressoSurface pixelSurface;
+    void clearPixels() { pixels = {}; pixelSurface = {}; convertedPixels = {}; convertedKey = 0; resetTools(); }
+    QPointF pageOrigin() const;
+    QRectF imageRect() const;
     double scale = 1;
     bool fresh = false;
     bool interactionActive = false;
@@ -30,6 +34,7 @@ public:
     void setTikzFigures(const QJsonArray &figures, bool available, const QIcon &icon = QIcon());
     void invalidateMagnifier() { magnifier->invalidate(); }
 signals:
+    void densityChanged();
     void sourceClicked(const QPointF &point);
     void activated();
     void interactionFinished();

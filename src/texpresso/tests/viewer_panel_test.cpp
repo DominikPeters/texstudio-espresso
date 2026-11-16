@@ -130,7 +130,7 @@ void ViewerPanelTest::hiddenPreviewKeepsCompilerWarm()
     QVERIFY(session->active()); QVERIFY(!session->userPaused); QCOMPARE(session->processId(), pid);
     for (const auto &row : commands) {
         const auto verb = row[0].toJsonArray()[0].toString();
-        QVERIFY2(verb != "preview-render" && verb != "preview-png" && verb != "preview-prepare", qPrintable(verb));
+        QVERIFY2(verb != "preview-surface" && verb != "preview-render" && verb != "preview-png" && verb != "preview-prepare", qPrintable(verb));
     }
     manager.setPreviewVisible(true);
     QTRY_VERIFY_WITH_TIMEOUT(session->preview.valid() && !session->preview.busy() && session->preview.image() != before, 15000);

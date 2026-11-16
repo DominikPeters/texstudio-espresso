@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     session->setAutoRerun(false); session->preview.setWidth(1600);
     int requests = 0;
     QObject::connect(&session->preview, &TexpressoPreview::command, [&](const QJsonArray &c) {
-        if (c[0] == "preview-png" || c[0] == "preview-render") ++requests;
+        if (c[0] == "preview-surface") ++requests;
     });
     const auto ready = [&] { return session->preview.valid() && !session->preview.busy(); };
     if (!waitFor([&] { return ready() || session->failed(); }) || session->failed()) {

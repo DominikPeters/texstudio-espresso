@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressopreview.h"
 #include "ViewerControls.h"
 #include <QBuffer>
@@ -35,7 +36,7 @@ static void deliver(TexpressoPreview &preview, const QJsonArray &request, Qt::Gl
 {
     QImage image(16, 24, QImage::Format_RGB32); image.fill(color);
     QByteArray png; QBuffer buffer(&png); buffer.open(QIODevice::WriteOnly); image.save(&buffer, "PNG");
-    preview.receive({{"requestId", request[1]}, {"revision", request[4]}, {"sequence", request[5]},
+    receiveTestSurface(preview, request, {{"requestId", request[1]}, {"revision", request[4]}, {"sequence", request[5]},
         {"page", request[2]}, {"width", 16}, {"height", 24}, {"bounds", QJsonArray{10, 20, 170, 260}},
         {"mime", "image/png"}, {"byteLength", png.size()}}, png);
 }
@@ -45,7 +46,7 @@ static void start(TexpressoPreview &preview)
 }
 void SourceRoutingTest::identifiedSearchRejectsReplacedIntent()
 {
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
     preview.setCapabilities({{"requestLifecycle", true}});
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
@@ -71,18 +72,18 @@ void SourceRoutingTest::identifiedSearchRejectsReplacedIntent()
 }
 void SourceRoutingTest::identifiedSearchCancellationSettlesImmediately()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"requestLifecycle", true}, {"backgroundRendering", true}});
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.setViewportPages({0}); preview.forward("definitions.tex", 10);
     const auto search = lastCommand(commands); QVERIFY(preview.followingSource());
     preview.message({"preview-cancelled", search[1]});
     QVERIFY(!preview.followingSource()); QVERIFY(preview.valid());
-    QTRY_COMPARE(lastCommand(commands)[0].toString(), QString("preview-background"));
+    QTRY_COMPARE(lastCommand(commands)[13].toInt(), 1);
 }
 void SourceRoutingTest::cancelledRenderReleasesRequestCredit()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"requestLifecycle", true}}); start(preview);
     const auto old = lastCommand(commands);
     preview.message({"preview-cancelled", old[1]});
@@ -93,7 +94,7 @@ void SourceRoutingTest::cancelledRenderReleasesRequestCredit()
 }
 void SourceRoutingTest::targetWaitsForItsDecodedFrame()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     bool currentGeometry = false;
     connect(&preview, &TexpressoPreview::reveal, this, [&](const QPointF &point) {
@@ -103,7 +104,7 @@ void SourceRoutingTest::targetWaitsForItsDecodedFrame()
     preview.forward("main.tex", 12); QVERIFY(preview.followingSource());
     preview.message({"preview-forward", 10, 0, 3, 70, 90});
     QCOMPARE(preview.page(), 3); QVERIFY(!preview.valid()); QVERIFY(reveals.isEmpty());
-    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-render"));
+    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-surface"));
     deliver(preview, request, Qt::green);
     // Decode is asynchronous: even after receiving bytes, old geometry cannot
     // move the viewport before the new image and bounds have been published.
@@ -113,7 +114,7 @@ void SourceRoutingTest::targetWaitsForItsDecodedFrame()
 }
 void SourceRoutingTest::cachedTargetRevealsWithSourceFlag()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.setPage(1); deliver(preview, lastCommand(commands), Qt::blue); QTRY_VERIFY(preview.valid());
     preview.setPage(0); QVERIFY(preview.valid());
@@ -131,14 +132,14 @@ void SourceRoutingTest::navigationCancelsForegroundCredit_data()
 void SourceRoutingTest::navigationCancelsForegroundCredit()
 {
     QFETCH(bool, scroll);
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal), manual(&preview, &TexpressoPreview::manualNavigated);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal), manual(&preview, &TexpressoPreview::manualNavigated);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.forward("main.tex", 10); preview.message({"preview-forward", 10, 0, 5, 50, 80});
     const auto obsolete = lastCommand(commands); QCOMPARE(obsolete[2].toInt(), 5);
     if (scroll) preview.setViewportPages({2}, true);
     else preview.navigateTo(2);
     QCOMPARE(manual.size(), 1); QVERIFY(!preview.followingSource()); QCOMPARE(preview.page(), 2);
-    const auto current = lastCommand(commands); QCOMPARE(current[0].toString(), QString("preview-render"));
+    const auto current = lastCommand(commands); QCOMPARE(current[0].toString(), QString("preview-surface"));
     QCOMPARE(current[2].toInt(), 2); QVERIFY(current[1] != obsolete[1]);
     bool cancelled = false;
     for (const auto &entry : commands) {
@@ -154,19 +155,19 @@ void SourceRoutingTest::navigationCancelsForegroundCredit()
 }
 void SourceRoutingTest::samePageNavigationRestartsRetiredExport()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.forward("main.tex", 10); preview.setWidth(777);
-    const auto obsolete = lastCommand(commands); QCOMPARE(obsolete[0].toString(), QString("preview-render"));
+    const auto obsolete = lastCommand(commands); QCOMPARE(obsolete[0].toString(), QString("preview-surface"));
     preview.navigateTo(0);
-    const auto current = lastCommand(commands); QCOMPARE(current[0].toString(), QString("preview-render"));
+    const auto current = lastCommand(commands); QCOMPARE(current[0].toString(), QString("preview-surface"));
     QVERIFY(current[1] != obsolete[1]); QCOMPARE(current[2].toInt(), 0);
     deliver(preview, obsolete, Qt::red); deliver(preview, current, Qt::blue);
     QTRY_COMPARE(preview.image().pixelColor(0, 0), QColor(Qt::blue)); QVERIFY(!preview.followingSource());
 }
 void SourceRoutingTest::layoutCannotOverridePendingSourceSearch()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.forward("main.tex", 10);
     preview.setViewportPages({2}, false); QCOMPARE(preview.page(), 0); QVERIFY(preview.followingSource());
@@ -177,7 +178,7 @@ void SourceRoutingTest::layoutCannotOverridePendingSourceSearch()
 }
 void SourceRoutingTest::decreasingRevisionCannotInvalidateCurrentFrame()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     const auto image = preview.image(); const auto count = commands.size();
     preview.message({"preview-state", 9, 0, 2, false, 1});
@@ -187,7 +188,7 @@ void SourceRoutingTest::decreasingRevisionCannotInvalidateCurrentFrame()
 }
 void SourceRoutingTest::editRejectsOldSearchAndOldFrame()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.forward("main.tex", 10); preview.message({"preview-forward", 10, 0, 5, 50, 80});
     const auto obsolete = lastCommand(commands);
@@ -200,18 +201,18 @@ void SourceRoutingTest::editRejectsOldSearchAndOldFrame()
 }
 void SourceRoutingTest::completedSearchWithoutTargetUnblocksSpeculation()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), manual(&preview, &TexpressoPreview::manualNavigated);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), manual(&preview, &TexpressoPreview::manualNavigated);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.setCapabilities({{"backgroundRendering", true}});
     preview.forward("definitions.tex", 10); preview.setViewportPages({0});
     QVERIFY(preview.followingSource());
     QTRY_VERIFY_WITH_TIMEOUT(!preview.followingSource(), 3000);
     QVERIFY(!preview.busy()); QCOMPARE(manual.size(), 0);
-    QTRY_COMPARE(lastCommand(commands)[0].toString(), QString("preview-background"));
+    QTRY_COMPARE(lastCommand(commands)[13].toInt(), 1);
 }
 void SourceRoutingTest::slowSearchSettlesOnCompletionAndAcceptsLateTarget()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal), manual(&preview, &TexpressoPreview::manualNavigated);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal), manual(&preview, &TexpressoPreview::manualNavigated);
     preview.setActive(true); preview.message({"preview-state", 10, 0, 2, false, 0});
     deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.setCapabilities({{"backgroundRendering", true}});
@@ -224,13 +225,13 @@ void SourceRoutingTest::slowSearchSettlesOnCompletionAndAcceptsLateTarget()
     // Completion may settle a source with no records. A reply already queued
     // for the same source intent remains valid and must still reveal its frame.
     preview.message({"preview-forward", 10, 0, 1, 50, 80});
-    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-render"));
+    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-surface"));
     deliver(preview, request, Qt::blue);
     QTRY_COMPARE(reveals.size(), 1); QCOMPARE(preview.page(), 1); QCOMPARE(manual.size(), 0);
 }
 void SourceRoutingTest::invalidationCannotReuseOldCompletion()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.forward("main.tex", 1000);
     preview.message({"preview-invalidated", 11, 0});
@@ -250,7 +251,7 @@ void SourceRoutingTest::navigationBounds_data()
 void SourceRoutingTest::navigationBounds()
 {
     QFETCH(bool, complete);
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command), manual(&preview, &TexpressoPreview::manualNavigated);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command), manual(&preview, &TexpressoPreview::manualNavigated);
     preview.setActive(true); preview.message({"preview-state", 10, 0, 8, complete, 0});
     deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     const auto hasCancel = [&](int page) {
@@ -276,7 +277,7 @@ void SourceRoutingTest::navigationBounds()
 }
 void SourceRoutingTest::sourceEpochCannotReuseOldCompletion()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     start(preview); deliver(preview, lastCommand(commands)); QTRY_VERIFY(preview.valid());
     preview.sourceChanged(1); preview.forward("main.tex", 1000);
     QTest::qWait(2200);
@@ -308,7 +309,7 @@ void SourceRoutingTest::sourceColumnsWordsAndMasks()
 }
 void SourceRoutingTest::preciseForwardAndInverse()
 {
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal),
         highlights(&preview, &TexpressoPreview::sourceHighlights), locations(&preview, &TexpressoPreview::sourceLocation);
     preview.setCapabilities({{"requestLifecycle", true}, {"synctexPrecision", 1}});

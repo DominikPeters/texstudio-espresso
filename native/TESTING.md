@@ -124,7 +124,7 @@ separate measurement. The provider's per-lookup process/time limits still apply.
 and `texpresso-rendering` cover precise request ownership, UTF-8/UTF-16 columns,
 repeated-word ambiguity, PDF source masks, scroll-follow without focus or compile
 work, and cached inverse lookup on a different foreground page. The rendering
-suite exercises both legacy and capability-gated protocols against disposable
+suite exercises the required display-density surface protocol against disposable
 LaTeX fixtures when `TEXPRESSO_TEST_ENGINE` is set. `texpresso-wsl` covers paths in
 precise requests and nested inverse replies.
 
@@ -134,3 +134,6 @@ file filtering before ranking, cache-only lookup, Unicode/ligature metadata,
 ambiguous whole words, and fragmented nested JSON arrays. Word-level precision
 remains opportunistic; missing font mappings or source boxes must fall back to
 line geometry rather than a fabricated position.
+
+Display-density surface geometry, cache ownership and deferred performance checks
+are described in [the surface preview notes](../docs/texpresso-surfaces.md).

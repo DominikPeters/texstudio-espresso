@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressowidget.h"
 #include <QBuffer>
 #include <QFile>
@@ -56,11 +57,11 @@ static void deliver(TexpressoPreview &preview, const QJsonArray &request, const 
         {"page", request[2]}, {"width", 16}, {"height", 24}, {"bounds", QJsonArray{0, 0, 600, 800}},
         {"mime", "image/png"}, {"byteLength", bytes.size()}};
     if (!textBounds.isEmpty()) header["textBounds"] = textBounds;
-    preview.receive(header, bytes);
+    receiveTestSurface(preview, request, header, bytes);
 }
 void PaginationTest::editForgetsExactCount()
 {
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     preview.message({"preview-state", 1, 0, 12, true, 0});
     QVERIFY(preview.complete()); QCOMPARE(preview.pageCount(), 12);
     preview.sourceChanged(1);
@@ -74,24 +75,24 @@ void PaginationTest::editForgetsExactCount()
 }
 void PaginationTest::completionRetiresBeyondEndRequests()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"backgroundRendering", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 4, false, 0});
     deliver(preview, last(commands)); QTRY_VERIFY(preview.valid());
     preview.setViewportPages({0, 4}); const auto obsolete = last(commands);
-    QCOMPARE(obsolete[0].toString(), QString("preview-background"));
+    QCOMPARE(obsolete[0].toString(), QString("preview-surface"));
     preview.message({"preview-state", 1, 0, 4, true, 0});
     deliver(preview, obsolete); QTest::qWait(20); QVERIFY(!preview.pageValid(4));
     const int before = commands.size(); QTest::qWait(250);
     for (int i = before; i < commands.size(); ++i) {
         const auto command = commands[i][0].toJsonArray();
-        if (command[0] == "preview-background") QVERIFY(command[2].toInt() < 4);
+        if (command[0] == "preview-surface" && command[13].toInt() == 1) QVERIFY(command[2].toInt() < 4);
     }
     preview.navigateTo(100000); QCOMPARE(preview.page(), 3);
 }
 void PaginationTest::previousTotalRemainsBestEstimate()
 {
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     preview.message({"preview-state", 1, 0, 20, true, 0});
     QVERIFY(!preview.estimatedPageCount());
     preview.sourceChanged(1);
@@ -110,7 +111,7 @@ void PaginationTest::previousTotalRemainsBestEstimate()
 }
 void PaginationTest::failedFrontierStopsAndRepairs()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"backgroundRendering", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, false, 0});
     deliver(preview, last(commands)); QTRY_VERIFY(preview.valid());
@@ -130,13 +131,13 @@ void PaginationTest::failedFrontierStopsAndRepairs()
 }
 void PaginationTest::lastPageIsBackgroundAndCancellable()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"backgroundRendering", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, false, 0});
     deliver(preview, last(commands)); QTRY_VERIFY(preview.valid());
     preview.lastPage(); const auto request = last(commands);
     QVERIFY(preview.findingLastPage()); QCOMPARE(preview.page(), 0); QVERIFY(preview.valid());
-    QCOMPARE(request[0].toString(), QString("preview-background"));
+    QCOMPARE(request[0].toString(), QString("preview-surface"));
     QCOMPARE(request[2].toInt(), 100000);
     preview.navigateTo(0); QVERIFY(!preview.findingLastPage());
     preview.lastPage();
@@ -149,7 +150,7 @@ void PaginationTest::lastPageIsBackgroundAndCancellable()
 }
 void PaginationTest::failedBeforeFirstPage()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setActive(true); preview.message({"preview-state", 1, 0, 0, false, 0});
     const auto request = last(commands);
     preview.message({"preview-error", request[1], "No page produced."});
@@ -160,7 +161,7 @@ void PaginationTest::failedBeforeFirstPage()
 }
 void PaginationTest::stoppedPassBoundsNavigation()
 {
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     preview.message({"preview-state", 1, 0, 3, false, 0});
     preview.message({"preview-stopped", 1, 0, 3});
     QVERIFY(preview.paginationStopped()); QVERIFY(!preview.complete());
@@ -190,7 +191,7 @@ void PaginationTest::endSearchCancellation_data()
 void PaginationTest::endSearchCancellation()
 {
     QFETCH(int, interruption);
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"backgroundRendering", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 2, false, 0});
     deliver(preview, last(commands)); QTRY_VERIFY(preview.valid());
@@ -213,7 +214,7 @@ void PaginationTest::endSearchCancellation()
 }
 void PaginationTest::automaticRerunPreservesEndIntent()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"backgroundRendering", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, false, 0});
     deliver(preview, last(commands)); QTRY_VERIFY(preview.valid());
@@ -223,7 +224,7 @@ void PaginationTest::automaticRerunPreservesEndIntent()
     preview.message({"preview-invalidated", 2, 0});
     QVERIFY(preview.findingLastPage()); QCOMPARE(preview.page(), 3);
     QCOMPARE(preview.estimatedPageCount().value_or(-1), 4);
-    QCOMPARE(last(commands)[0].toString(), QString("preview-background"));
+    QCOMPARE(last(commands)[0].toString(), QString("preview-surface"));
     preview.message({"preview-state", 2, 0, 5, true, 3});
     QCOMPARE(preview.page(), 4);
     preview.navigateTo(0);
@@ -239,7 +240,7 @@ void PaginationTest::lastPageWaitsForFrameAndReveals_data()
 void PaginationTest::lastPageWaitsForFrameAndReveals()
 {
     QFETCH(bool, successful);
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     QSignalSpy commands(&preview, &TexpressoPreview::command), reveals(&preview, &TexpressoPreview::reveal);
     preview.setCapabilities({{"backgroundRendering", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, false, 0});
@@ -249,7 +250,7 @@ void PaginationTest::lastPageWaitsForFrameAndReveals()
     if (!successful) preview.message({"preview-error", endRequest[1], "No more pages."});
     QCOMPARE(preview.page(), 3); QVERIFY(reveals.isEmpty());
     const auto frame = last(commands);
-    QCOMPARE(frame[0].toString(), QString("preview-render")); QCOMPARE(frame[2].toInt(), 3);
+    QCOMPARE(frame[0].toString(), QString("preview-surface")); QCOMPARE(frame[2].toInt(), 3);
     // A queued layout update still reports the old viewport before the final
     // frame arrives. It must not pull the explicit navigation back to page 1.
     preview.setViewportPages({0}); QCOMPARE(preview.page(), 3);
@@ -294,7 +295,7 @@ static QByteArray document(int pages)
 }
 void PaginationTest::replayKeepsPublishedAvailability()
 {
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     preview.message({"preview-state", 1, 0, 5, false, 2});
     preview.message({"preview-state", 1, 0, 1, false, 2});
     QCOMPARE(preview.pageCount(), 5);
@@ -305,7 +306,7 @@ void PaginationTest::replayKeepsPublishedAvailability()
 }
 void PaginationTest::failedPassKeepsTextGeometry()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setActive(true); preview.message({"preview-state", 1, 0, 3, true, 0});
     deliver(preview, last(commands), {150, 10, 450, 700}); QTRY_VERIFY(preview.valid());
     preview.navigateTo(1); deliver(preview, last(commands), {100, 10, 500, 700}); QTRY_VERIFY(preview.valid());

@@ -11,7 +11,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/../pdfviewer/ViewerComponents.cmake")
 add_library(texpresso-client STATIC
-    texpressoprotocol.cpp texpressoprotocol.h
+    texpressoprotocol.cpp texpressoprotocol.h texpressosurface.h
     texpressoprocess.cpp texpressoprocess.h
     texpressoprovider.cpp texpressoprovider.h
     texpressowsl.cpp texpressowsl.h

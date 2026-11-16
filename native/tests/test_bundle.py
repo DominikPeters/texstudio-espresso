@@ -23,7 +23,7 @@ class BundleTests(unittest.TestCase):
             path.chmod(0o755)
             entries.append({'path': 'bin/' + name, 'sha256': sha256(path)})
         self.manifest = {'engineRevision': 'pinned', 'platform': 'linux', 'architecture': 'aarch64',
-                         'capabilities': {'previewProtocol': 1, 'codecs': ['png']}, 'files': entries}
+                         'capabilities': {'previewProtocol': 1, 'codecs': ['png'], 'surfaces': 1}, 'files': entries}
 
     def check(self, system='linux'):
         (self.root / 'build-manifest.json').write_text(json.dumps(self.manifest))
@@ -83,6 +83,11 @@ class BundleTests(unittest.TestCase):
     def test_missing_worker(self):
         self.manifest['files'].pop()
         with self.assertRaisesRegex(ValueError, 'executable'):
+            self.check()
+
+    def test_requires_surfaces(self):
+        self.manifest['capabilities'].pop('surfaces')
+        with self.assertRaisesRegex(ValueError, 'surfaces'):
             self.check()
 
     def test_requires_preview(self):

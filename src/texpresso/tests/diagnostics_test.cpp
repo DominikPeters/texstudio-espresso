@@ -52,10 +52,10 @@ void TexpressoDiagnosticsTest::dviPageFailureKeepsEngineUsable()
     QSignalSpy ready(&process, &TexpressoProcess::ready), images(&process, &TexpressoProcess::image),
         messages(&process, &TexpressoProcess::message), failures(&process, &TexpressoProcess::failed);
     process.start(engine, root); QTRY_VERIFY_WITH_TIMEOUT(!ready.isEmpty(), 10000);
-    process.send({"preview-render", 1, 0, 512, 1, 0});
+    process.send({"preview-surface", 1, 0, 512, 1, 0, 0, 0, 512, 1024, 0, 0, 0, 0});
     QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty() || !failures.isEmpty(), 10000);
     QVERIFY(failures.isEmpty()); QCOMPARE(images.last()[0].toJsonObject()["requestId"].toInt(), 1);
-    process.send({"preview-render", 2, 1, 512, 1, 0});
+    process.send({"preview-surface", 2, 1, 512, 1, 0, 0, 0, 512, 1024, 0, 0, 0, 0});
     const auto pageFailed = [&] {
         for (const auto &event : messages) {
             const auto m = event[0].toJsonArray();
@@ -65,7 +65,7 @@ void TexpressoDiagnosticsTest::dviPageFailureKeepsEngineUsable()
     };
     QTRY_VERIFY_WITH_TIMEOUT(pageFailed() || !failures.isEmpty(), 10000);
     QVERIFY(pageFailed()); QVERIFY(failures.isEmpty()); QVERIFY(process.running());
-    process.send({"preview-render", 3, 0, 512, 1, 0});
+    process.send({"preview-surface", 3, 0, 512, 1, 0, 0, 0, 512, 1024, 0, 0, 0, 0});
     QTRY_VERIFY_WITH_TIMEOUT(images.last()[0].toJsonObject()["requestId"].toInt() == 3 || !failures.isEmpty(), 10000);
     QVERIFY(failures.isEmpty()); QVERIFY(process.running()); process.stop();
 }

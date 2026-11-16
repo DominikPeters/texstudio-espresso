@@ -112,7 +112,7 @@ void TikzTest::protocolValidation()
     QJsonObject figure{{"bounds", QJsonArray{20, 30, 100, 80}}, {"file", "café main.tex"}, {"line", 4}, {"endLine", 8}};
     QJsonObject annotations{{"links", QJsonArray{}}, {"destinations", QJsonArray{}}, {"figures", QJsonArray{figure}}};
     QJsonObject header{{"requestId", 1}, {"revision", 1}, {"sequence", 0}, {"page", 0}, {"width", 20}, {"height", 30},
-        {"mime", "image/png"}, {"byteLength", 20}, {"bounds", QJsonArray{0, 0, 200, 300}}, {"annotations", annotations}};
+        {"grid", QJsonArray{20, 30}}, {"clip", QJsonArray{0, 0, 20, 30}}, {"rasterId", 1}, {"mime", "image/png"}, {"byteLength", 20}, {"bounds", QJsonArray{0, 0, 200, 300}}, {"annotations", annotations}};
     QVERIFY(TexpressoProtocol::validImage(header));
     for (const auto &pair : QList<QPair<QString, QJsonValue>>{{"line", 0}, {"line", 1.5}, {"endLine", 4},
              {"file", "bad\nfile"}, {"bounds", QJsonArray{0, 0, -1, 2}}}) {

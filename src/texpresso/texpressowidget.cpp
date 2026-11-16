@@ -77,8 +77,9 @@ TexpressoCanvas::TexpressoCanvas(PDFDocumentConfig *config, QScrollArea *area)
             }
             QPixmap result(region.size()); result.fill(Qt::white);
             QPainter painter(&result); painter.setRenderHint(QPainter::SmoothPixmapTransform);
-            painter.drawImage(QRectF(-region.x(), -region.y(), pageBounds.width() * resolution / 72,
-                pageBounds.height() * resolution / 72), pixels);
+            const auto b = pixelSurface.isEmpty() ? pageBounds : pixelSurface.pageRect(pageBounds);
+            painter.drawImage(QRectF((b.topLeft() - pageBounds.topLeft()) * resolution / 72 - QPointF(region.topLeft()),
+                b.size() * resolution / 72), pixels);
             return result;
         });
     magnifier->hide();
@@ -99,7 +100,7 @@ void TexpressoCanvas::setAnnotations(int page, qint64 revision, qint64 sequence,
 int TexpressoCanvas::linkAt(const QPoint &point) const
 {
     if (!fresh || pixels.isNull() || annotationPage < 0 || scale <= 0 || !rect().contains(point)) return -1;
-    const QPointF pagePoint = pageBounds.topLeft() + QPointF(point) / scale;
+    const QPointF pagePoint = pageBounds.topLeft() + (QPointF(point) - pageOrigin()) / scale;
     const auto links = annotations.value("links").toArray();
     for (int i = 0; i < links.size(); ++i) {
         const auto link = links[i].toObject();
@@ -152,7 +153,7 @@ void TexpressoCanvas::setTikzFigures(const QJsonArray &figures, bool available, 
 int TexpressoCanvas::figureAt(const QPoint &point) const
 {
     if (!tikzAvailable || !fresh || pixels.isNull() || scale <= 0 || !rect().contains(point)) return -1;
-    const auto p = pageBounds.topLeft() + QPointF(point) / scale;
+    const auto p = pageBounds.topLeft() + (QPointF(point) - pageOrigin()) / scale;
     for (int i = 0; i < tikzFigures.size(); ++i) {
         const auto b = tikzFigures[i].toObject()["bounds"].toArray();
         if (b.size() == 4 && QRectF(QPointF(b[0].toDouble(), b[1].toDouble()),
@@ -167,7 +168,7 @@ QRectF TexpressoCanvas::figureRect(int index) const
     if (bounds.size() != 4) return {};
     const QRectF pageRect(QPointF(bounds[0].toDouble(), bounds[1].toDouble()),
         QPointF(bounds[2].toDouble(), bounds[3].toDouble()));
-    return QRectF((pageRect.topLeft() - pageBounds.topLeft()) * scale, pageRect.size() * scale)
+    return QRectF(pageOrigin() + (pageRect.topLeft() - pageBounds.topLeft()) * scale, pageRect.size() * scale)
         .adjusted(-4, -4, 4, 4);
 }
 QRect TexpressoCanvas::figureVisibleArea() const
@@ -252,6 +253,12 @@ void TexpressoCanvas::setPreview(TexpressoPreview *value)
 }
 bool TexpressoCanvas::event(QEvent *event)
 {
+    if (event->type() == QEvent::ScreenChangeInternal
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+        || event->type() == QEvent::DevicePixelRatioChange
+#endif
+    ) emit densityChanged();
+    if (event->type() == QEvent::Move) update(); // Fractional-DPR scroll phase can change.
     if (event->type() == QEvent::Hide || event->type() == QEvent::WindowDeactivate
         || event->type() == QEvent::Move || event->type() == QEvent::Resize) hideFigurePopup();
     if (event->type() == QEvent::NativeGesture) {
@@ -316,6 +323,21 @@ bool TexpressoCanvas::event(QEvent *event)
     }
     return handled;
 }
+QPointF TexpressoCanvas::pageOrigin() const
+{
+    const qreal dpr = devicePixelRatioF();
+    const QPointF global = mapToGlobal(QPoint());
+    return QPointF(std::round(global.x() * dpr) / dpr, std::round(global.y() * dpr) / dpr) - global;
+}
+QRectF TexpressoCanvas::imageRect() const
+{
+    if (pixelSurface.isEmpty()) return rect();
+    const auto dpr = devicePixelRatioF();
+    if (pixelSurface.grid.width() == qRound(pageBounds.width() * scale * dpr))
+        return {pageOrigin() + QPointF(pixelSurface.clip.topLeft()) / dpr, QSizeF(pixelSurface.clip.size()) / dpr};
+    const auto b = pixelSurface.pageRect(pageBounds);
+    return {pageOrigin() + (b.topLeft() - pageBounds.topLeft()) * scale, b.size() * scale};
+}
 void TexpressoCanvas::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
@@ -330,19 +352,19 @@ void TexpressoCanvas::paintEvent(QPaintEvent *)
     }
     if (!config->invertColors && !config->grayscale) {
         convertedPixels = {}; convertedKey = 0;
-        painter.drawImage(rect(), pixels);
+        painter.drawImage(imageRect(), pixels);
     } else {
         if (convertedKey != pixels.cacheKey() || convertedInvert != config->invertColors || convertedGray != config->grayscale) {
             convertedPixels = convertImage(QPixmap::fromImage(pixels), config->invertColors, config->grayscale);
             convertedKey = pixels.cacheKey(); convertedInvert = config->invertColors; convertedGray = config->grayscale;
         }
-        painter.drawPixmap(rect(), convertedPixels);
+        painter.drawPixmap(imageRect(), convertedPixels, convertedPixels.rect());
     }
     if (fresh && !sourceHighlights.isEmpty()) {
         painter.save();
         painter.setPen(Qt::NoPen); painter.setBrush(QColor(config->highlightColor));
         for (const auto &r : sourceHighlights)
-            painter.drawRect(QRectF((r.topLeft() - pageBounds.topLeft()) * scale, r.size() * scale));
+            painter.drawRect(QRectF(pageOrigin() + (r.topLeft() - pageBounds.topLeft()) * scale, r.size() * scale));
         painter.restore();
     }
     if (fresh && figurePopup->isVisible() && hoveredFigure >= 0) {
@@ -412,8 +434,8 @@ void TexpressoCanvas::mouseReleaseEvent(QMouseEvent *event)
     else if (wasLinkGesture) { /* A cancelled link gesture never turns into a tool gesture. */ }
     else if (fresh && (ViewerControls::isSyncClick(pressedModifiers) || ((pressedModifiers & Qt::MetaModifier) && !(pressedModifiers & Qt::ShiftModifier)))
         && (ViewerControls::isSyncClick(event->modifiers()) || ((event->modifiers() & Qt::MetaModifier) && !(event->modifiers() & Qt::ShiftModifier)))) {
-        const auto point = event->pos();
-        emit sourceClicked(QPointF(point.x() / scale + pageBounds.left(), point.y() / scale + pageBounds.top()));
+        const QPointF point = QPointF(event->pos()) - pageOrigin();
+        emit sourceClicked(pageBounds.topLeft() + point / scale);
     } else if ((pressedModifiers & Qt::ControlModifier) && (pressedModifiers & Qt::ShiftModifier)
         && (event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier)) {
         const auto point = event->pos();
@@ -524,7 +546,7 @@ TexpressoWidget::TexpressoWidget(TexpressoManager *manager, PDFDocumentConfig *c
     widthTimer.setSingleShot(true); widthTimer.setInterval(100);
     connect(&widthTimer, &QTimer::timeout, this, [this] {
         if (!previewEnabled) return;
-        if (auto session = this->manager->current()) session->preview.setWidth(qRound(canvas->width() * devicePixelRatioF()));
+        updateViewport();
     });
     refreshTimer.setSingleShot(true);
     connect(&refreshTimer, &QTimer::timeout, this, &TexpressoWidget::refresh);
@@ -632,8 +654,8 @@ void TexpressoWidget::refresh()
     if (switched) {
         zoomScrollPosition = QPoint(-1, -1); zoomScrollRemainder = {};
         knownBounds.clear(); extentPages = 1; viewportPage = session ? session->preview.page() : 0;
-        canvas->pixels = {}; canvas->setProperty("texpressoPage", -1);
-        for (auto page : extraCanvases) { page->hide(); page->pixels = {}; page->setProperty("texpressoPage", -1); }
+        canvas->clearPixels(); canvas->setProperty("texpressoPage", -1);
+        for (auto page : extraCanvases) { page->hide(); page->clearPixels(); page->setProperty("texpressoPage", -1); }
         disconnect(externalLinkConnection);
         if (session) externalLinkConnection = connect(&session->preview, &TexpressoPreview::externalLinkRequested,
             this, [this](const QUrl &url) { ViewerLinks::openUrl(url, this); });
@@ -722,8 +744,8 @@ void TexpressoWidget::refresh()
         }
     } else {
         setStatus(tr("Open a saved LaTeX project to start live preview."));
-        canvas->pixels = {}; canvas->fresh = false; canvas->setAnnotations(-1, -1, -1, {}); canvas->hide();
-        for (auto page : extraCanvases) { page->hide(); page->pixels = {}; page->fresh = false; page->setPreview(nullptr); page->setAnnotations(-1, -1, -1, {}); }
+        canvas->clearPixels(); canvas->fresh = false; canvas->setAnnotations(-1, -1, -1, {}); canvas->hide();
+        for (auto page : extraCanvases) { page->hide(); page->clearPixels(); page->fresh = false; page->setPreview(nullptr); page->setAnnotations(-1, -1, -1, {}); }
         documentCanvas->resize(1, 1); pages.count->clear();
     }
     updateStateIcons();
@@ -759,16 +781,17 @@ void TexpressoWidget::updateCanvas(TexpressoCanvas *pageCanvas, int page)
     auto &preview = shown->preview;
     QImage image = preview.pageImage(page);
     QRectF bounds = preview.boundsForPage(page);
+    auto surface = preview.surfaceForPage(page);
     const bool samePage = pageCanvas->property("texpressoPage").isValid()
         && pageCanvas->property("texpressoPage").toInt() == page;
     // Invalidating a revision or changing raster width must disable interaction
     // immediately, but keep the last pixels for this page until its replacement
     // arrives. Never carry pixels over to a different page or project.
-    if (image.isNull() && samePage) { image = pageCanvas->pixels; bounds = pageCanvas->pageBounds; }
+    if (image.isNull() && samePage) { image = pageCanvas->pixels; bounds = pageCanvas->pageBounds; surface = pageCanvas->pixelSurface; }
     if (image.isNull()) {
         for (auto other : extraCanvases) {
             if (other->property("texpressoPage").toInt() != page || other->pixels.isNull()) continue;
-            image = other->pixels; bounds = other->pageBounds; break;
+            image = other->pixels; bounds = other->pageBounds; surface = other->pixelSurface; break;
         }
     }
     const bool changed = pageCanvas->pixels.cacheKey() != image.cacheKey()
@@ -776,7 +799,7 @@ void TexpressoWidget::updateCanvas(TexpressoCanvas *pageCanvas, int page)
     if (changed || !samePage) { pageCanvas->resetTools(); pageCanvas->invalidateMagnifier(); }
     pageCanvas->sourceHighlights = page == sourceHighlightPage && sourceHighlightRevision == preview.revision()
         && sourceHighlightSequence == preview.sequence() ? sourceHighlightRects : QList<QRectF>();
-    pageCanvas->pixels = image; pageCanvas->pageBounds = bounds;
+    pageCanvas->pixels = image; pageCanvas->pageBounds = bounds; pageCanvas->pixelSurface = surface;
     pageCanvas->setProperty("texpressoPage", page);
     pageCanvas->fresh = preview.pageValid(page) && !shown->userStopped && !shown->failed() && !shown->externalBuildRunning();
     pageCanvas->setAnnotations(page, preview.revision(), preview.sequence(), preview.annotationsForPage(page));
@@ -786,6 +809,7 @@ void TexpressoWidget::updateCanvas(TexpressoCanvas *pageCanvas, int page)
 }
 void TexpressoWidget::connectCanvas(TexpressoCanvas *pageCanvas)
 {
+    connect(pageCanvas, &TexpressoCanvas::densityChanged, this, [this] { refreshTimer.start(); });
     connect(pageCanvas, &TexpressoCanvas::tikzActivated, this, [this](int page, int index, qint64 revision, qint64 sequence) {
         if (!shown) return;
         const auto figure = shown->tikzFigure(page, index, revision, sequence);
@@ -842,7 +866,7 @@ void TexpressoWidget::revealPoint(const QPointF &point, bool source)
     // The controller publishes the destination frame before revealing it; the
     // coalesced refresh may still hold another page's pixels and dimensions.
     canvas->resetTools();
-    canvas->pixels = preview.image(); canvas->pageBounds = preview.bounds(); canvas->fresh = true;
+    canvas->pixels = preview.image(); canvas->pixelSurface = preview.surface(); canvas->pageBounds = preview.bounds(); canvas->fresh = true;
     canvas->setAnnotations(preview.page(), preview.revision(), preview.sequence(), preview.annotationsForPage(preview.page()));
     canvas->invalidateMagnifier();
     layoutPage(); viewportPage = preview.page();
@@ -965,7 +989,7 @@ void TexpressoWidget::layoutPage()
     actions["fitToTextWidth"]->setChecked(preview.zoom == -2);
     actions["zoomIn"]->setEnabled(factor < 4); zoomControls.in->setEnabled(factor < 4);
     actions["zoomOut"]->setEnabled(factor > .125); zoomControls.out->setEnabled(factor > .125);
-    const int widthPixels = qRound(canvas->width() * devicePixelRatioF());
+    const int widthPixels = qRound(bounds.width() * canvas->scale * devicePixelRatioF());
     if (shown != rasterSession || widthPixels != rasterWidth) {
         rasterSession = shown; rasterWidth = widthPixels; widthTimer.start();
     }
@@ -988,13 +1012,24 @@ void TexpressoWidget::updateViewport(bool gesture)
     const int previousPage = canvas->property("texpressoPage").toInt();
     const QImage previousPixels = canvas->pixels;
     const QRectF previousBounds = canvas->pageBounds;
-    if (continuous) preview.setViewportPages(visible, gesture);
-    else preview.setViewportPages({preview.page()}, gesture);
+    const auto previousSurface = canvas->pixelSurface;
+    QList<TexpressoPreview::Viewport> demands;
+    for (int page : continuous ? visible : QList<int>{preview.page()}) {
+        if (page >= pageRects.size()) continue;
+        const auto bounds = knownBounds.value(page, preview.boundsForPage(page));
+        const int gridWidth = std::clamp(qRound(bounds.width() * canvas->scale * devicePixelRatioF()), 1, 65536);
+        const double density = gridWidth / bounds.width();
+        const auto local = pageRects[page].intersected(viewport).translated(-pageRects[page].topLeft());
+        const double ratio = density / canvas->scale;
+        const QRect clip = QRectF(QPointF(local.topLeft()) * ratio, QSizeF(local.size()) * ratio).toAlignedRect();
+        if (!clip.isEmpty()) demands.append({page, gridWidth, clip});
+    }
+    preview.setViewport(demands, gesture);
     // The controller may select a new primary page synchronously. Move its
     // pixels and geometry together, before returning to the event loop.
     updateCanvas(canvas, preview.page());
     if (preview.page() < pageRects.size()) canvas->setGeometry(pageRects[preview.page()]);
-    canvas->show();
+    canvas->show(); canvas->update();
     int slot = 0; bool geometryChanged = false;
     const QList<int> ordered = continuous ? visible : QList<int>{};
     for (int page : ordered) {
@@ -1011,7 +1046,7 @@ void TexpressoWidget::updateViewport(bool gesture)
         auto extra = extraCanvases[slot++];
         extra->setPreview(&preview); extra->scale = canvas->scale;
         if (page == previousPage && preview.pageImage(page).isNull()) {
-            extra->pixels = previousPixels; extra->pageBounds = previousBounds; extra->setProperty("texpressoPage", page);
+            extra->pixels = previousPixels; extra->pageBounds = previousBounds; extra->pixelSurface = previousSurface; extra->setProperty("texpressoPage", page);
         }
         updateCanvas(extra, page);
         if (preview.pageValid(page) && knownBounds.value(page) != extra->pageBounds) {
@@ -1019,10 +1054,10 @@ void TexpressoWidget::updateViewport(bool gesture)
         }
         extra->setTool(config->editTool); extra->setGeometry(pageRects[page]); extra->show(); extra->update();
     }
-    for (; slot < extraCanvases.size(); ++slot) { extraCanvases[slot]->hide(); extraCanvases[slot]->pixels = {}; extraCanvases[slot]->fresh = false; extraCanvases[slot]->resetTools(); extraCanvases[slot]->setAnnotations(-1, -1, -1, {}); }
+    for (; slot < extraCanvases.size(); ++slot) { extraCanvases[slot]->hide(); extraCanvases[slot]->clearPixels(); extraCanvases[slot]->fresh = false; extraCanvases[slot]->resetTools(); extraCanvases[slot]->setAnnotations(-1, -1, -1, {}); }
     if (geometryChanged && !refreshTimer.isActive()) refreshTimer.start();
 }
-void TexpressoWidget::resizeEvent(QResizeEvent *event) { QWidget::resizeEvent(event); layoutPage(); }
+void TexpressoWidget::resizeEvent(QResizeEvent *event) { QWidget::resizeEvent(event); layoutPage(); updateViewport(); }
 
 void TexpressoWidget::clearSourceHighlights()
 {

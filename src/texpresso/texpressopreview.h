@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QUrl>
 #include <QHash>
+#include "texpressosurface.h"
 
 class TexpressoPreview : public QObject
 {
@@ -40,6 +41,10 @@ public:
     bool preciseSync() const { return supportsPreciseSync; }
     void forward(const QString &path, int zeroBasedLine, int column = 0, const QString &word = QString(), bool highlight = true);
     void releaseCache();
+    struct Viewport { int page, width; QRect visible; };
+    void setViewport(const QList<Viewport> &viewport, bool gesture = false);
+    TexpressoSurface surfaceForPage(int page) const;
+    TexpressoSurface surface() const { return pixelSurface; }
     void setViewportPages(const QList<int> &visible, bool gesture = false);
     QImage pageImage(int page) const;
     QRectF boundsForPage(int page) const;
@@ -87,10 +92,13 @@ private:
     void request();
     void decode(Frame frame);
     bool matches(const QJsonObject &header) const;
-    struct CachedPage { int page, width; QImage image; QRectF bounds; QJsonObject annotations; };
+    struct CachedPage { int page; QImage image; QRectF bounds; QJsonObject annotations; TexpressoSurface surface; qint64 rasterId; };
+    TexpressoSurface wantedSurface(int page, bool overscan = true) const;
+    bool surfaceReady(int page) const;
+    void sendSurface(int page, const TexpressoSurface &surface, bool background, qint64 base = 0);
     void clearCache();
     void cachePage();
-    void storePage(int page, int width, const QImage &image, const QRectF &bounds, const QJsonObject &annotations = {});
+    void storePage(int page, const QImage &image, const QRectF &bounds, const QJsonObject &annotations, const TexpressoSurface &surface, qint64 raster);
     void cancelDestination(bool notifyEngine = true);
     void finishDestination();
     void finishForward();
@@ -109,6 +117,10 @@ private:
     mutable QRectF textRange;
     mutable bool textRangeDirty = false;
     QImage pixels;
+    TexpressoSurface pixelSurface, flightSurface;
+    QHash<int, Viewport> viewports;
+    qint64 flightBase = 0;
+    bool forceKeyframe = false;
     QRectF pageBounds;
     QJsonObject pageAnnotations;
     struct Destination { QString name; qint64 revision, sequence; int page = -1; };
@@ -136,16 +148,14 @@ private:
     QList<int> visiblePages;
     QSet<int> prefetched;
     QTimer prefetchTimer, gestureTimer, forwardTimer, destinationTimer;
-    bool supportsLinks = false, supportsBackground = false, renderingBackground = false, gestureActive = false, preparationPending = false;
+    bool supportsLinks = false, renderingBackground = false, gestureActive = false, preparationPending = false;
     bool prefetchReady = false, pumping = false;
-    int flightPage = 0, flightWidth = 1200, frontierBudget = 1;
+    int flightPage = 0, frontierBudget = 1;
     bool needsNativePage = false;
     std::optional<QPointF> pendingInverse;
-    bool supportsRegions = false, supportsPatches = false, renderingRegion = false;
+    bool renderingRegion = false;
     std::optional<Region> pendingRegion;
     qint64 regionToken = -1, flightRegionToken = -1, rasterId = 0;
     int rasterPage = -1;
-    QRectF rasterBounds;
-    QSize rasterSize;
 };
 #endif

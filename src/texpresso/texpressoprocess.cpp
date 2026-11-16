@@ -99,8 +99,8 @@ TexpressoProcess::TexpressoProcess(QObject *parent) : QObject(parent)
         if (stopping) return;
         const auto features = QJsonDocument::fromJson(probe.readAllStandardOutput()).object();
         if (status != QProcess::NormalExit || code || features["previewProtocol"].toInt() != 1
-            || !features["codecs"].toArray().contains("png")) {
-            emit failed(tr("The bundled TeXpresso engine does not support PNG preview protocol 1. %1").arg(QString::fromUtf8(probe.readAllStandardError()).trimmed())); return;
+            || !features["codecs"].toArray().contains("png") || features["surfaces"].toInt() != 1) {
+            emit failed(tr("The bundled TeXpresso engine does not support display-density PNG surfaces. Update the application and its bundled engine together. %1").arg(QString::fromUtf8(probe.readAllStandardError()).trimmed())); return;
         }
         child.setProgram(wsl.enabled ? QStringLiteral("wsl.exe") : program);
         QStringList arguments = TexpressoProvider::engineArguments(provider, installPackages, features);

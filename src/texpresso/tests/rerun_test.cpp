@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressomanager.h"
 #include <QBuffer>
 #include <QFile>
@@ -34,7 +35,7 @@ void RerunTest::traceSession(TexpressoSession *live, QFile &trace, const QString
 }
 void RerunTest::terminalWithoutPages()
 {
-    TexpressoPreview preview;
+    TexpressoPreview preview; preview.setWidth(16);
     QSignalSpy commands(&preview, &TexpressoPreview::command), failures(&preview, &TexpressoPreview::failed);
     preview.setActive(true); preview.sourceChanged(1);
     preview.message({"preview-state", 2, 1, 0, true, 0});
@@ -48,14 +49,14 @@ void RerunTest::terminalWithoutPages()
     const auto request = commands.last()[0].toJsonArray();
     QImage pixels(2, 2, QImage::Format_RGB32); pixels.fill(Qt::red);
     QByteArray bytes; QBuffer buffer(&bytes); QVERIFY(buffer.open(QIODevice::WriteOnly)); QVERIFY(pixels.save(&buffer, "PNG"));
-    preview.receive({{"requestId", request[1]}, {"revision", 3}, {"sequence", 2}, {"page", 0},
+    receiveTestSurface(preview, request, {{"requestId", request[1]}, {"revision", 3}, {"sequence", 2}, {"page", 0},
         {"bounds", QJsonArray{0, 0, 612, 792}}, {"width", 2}, {"height", 2},
         {"mime", "image/png"}, {"byteLength", bytes.size()}}, bytes);
-    QTRY_VERIFY(preview.valid()); QCOMPARE(preview.image(), pixels);
+    QTRY_VERIFY(preview.valid()); QCOMPARE(preview.image().pixelColor(0, 0), pixels.pixelColor(0, 0));
     commands.clear(); preview.sourceChanged(3);
     preview.message({"preview-state", 4, 3, 0, true, 0});
     QCOMPARE(failures.size(), 2); QVERIFY(!preview.valid()); QVERIFY(commands.isEmpty());
-    QCOMPARE(preview.image(), pixels); // Retain the previous picture as stale.
+    QCOMPARE(preview.image().pixelColor(0, 0), pixels.pixelColor(0, 0)); // Retain the previous picture as stale.
 }
 void RerunTest::stableRerun_data()
 {

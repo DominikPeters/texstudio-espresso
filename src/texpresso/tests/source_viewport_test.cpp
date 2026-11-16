@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressowidget.h"
 #include <QBuffer>
 #include <QScrollBar>
@@ -42,7 +43,7 @@ void SourceViewportTest::init()
     // No process is started: use real frame decoding and controller state with
     // deterministic geometry, independent of installed TeX or screen timing.
     session = std::make_unique<TexpressoSession>("/tmp/source-viewport.tex", QString(), TexpressoSession::Buffers{});
-    session->preview.zoom = .75; session->preview.setActive(true);
+    session->preview.setWidth(16); session->preview.zoom = .75; session->preview.setActive(true);
     widget->shown = session.get();
     frame();
 }
@@ -56,7 +57,7 @@ void SourceViewportTest::frame(int page, QRectF bounds, QRectF text)
     if (!preview.valid()) {
         QVERIFY(!commands.isEmpty());
         const auto request = commands.last()[0].toJsonArray();
-        QCOMPARE(request[0].toString(), QString("preview-render"));
+        QCOMPARE(request[0].toString(), QString("preview-surface"));
         QImage image(16, 24, QImage::Format_RGB32); image.fill(page == 0 ? Qt::red : Qt::blue);
         QByteArray png; QBuffer buffer(&png); QVERIFY(buffer.open(QIODevice::WriteOnly)); QVERIFY(image.save(&buffer, "PNG"));
         QJsonObject header{{"requestId", request[1]}, {"revision", request[4]}, {"sequence", request[5]},
@@ -64,7 +65,7 @@ void SourceViewportTest::frame(int page, QRectF bounds, QRectF text)
             {"bounds", QJsonArray{bounds.left(), bounds.top(), bounds.right(), bounds.bottom()}},
             {"mime", "image/png"}, {"byteLength", png.size()}};
         if (!text.isEmpty()) header["textBounds"] = QJsonArray{text.left(), text.top(), text.right(), text.bottom()};
-        preview.receive(header, png);
+        receiveTestSurface(preview, request, header, png);
         QTRY_VERIFY(preview.valid());
     }
     widget->canvas->pixels = preview.image(); widget->canvas->pageBounds = preview.bounds(); widget->canvas->fresh = true;
@@ -274,6 +275,7 @@ void SourceViewportTest::scrollFollowingUsesPublishedPageWithoutFocus()
     session->setActive(true); config.followFromScroll = true;
     QSignalSpy commands(&preview, &TexpressoPreview::command), sources(session.get(), &TexpressoSession::sourceLocation);
     widget->updateViewport();
+    commands.clear(); // Viewport rendering is independent of the cache-only source lookup.
     const auto before = scroll();
     widget->syncVisibleSource();
     QCOMPARE(commands.size(), 1);

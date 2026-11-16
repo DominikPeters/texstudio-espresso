@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressopreview.h"
 #include "texpressoprotocol.h"
 #include "texpressomanager.h"
@@ -39,7 +40,7 @@ static QJsonObject frameHeader(int length)
 {
     return {{"requestId", 1}, {"revision", 1}, {"sequence", 0}, {"page", 0},
         {"width", 16}, {"height", 24}, {"bounds", QJsonArray{10, 20, 170, 260}},
-        {"mime", "image/png"}, {"byteLength", length}};
+        {"grid", QJsonArray{16, 24}}, {"clip", QJsonArray{0, 0, 16, 24}}, {"rasterId", 1}, {"mime", "image/png"}, {"byteLength", length}};
 }
 static QJsonArray lastCommand(const QSignalSpy &commands) { return commands.last()[0].toJsonArray(); }
 static QByteArray png()
@@ -54,7 +55,7 @@ static void deliver(TexpressoPreview &preview, const QJsonArray &request, const 
     header["requestId"] = request[1]; header["page"] = request[2];
     header["revision"] = request[4]; header["sequence"] = request[5]; header["annotations"] = metadata;
     if (raster) header["rasterId"] = raster;
-    preview.receive(header, bytes);
+    receiveTestSurface(preview, request, header, bytes);
 }
 static int linkIndex(const QJsonObject &metadata, const QString &uri)
 {
@@ -106,7 +107,7 @@ void LinksTest::annotationValidation()
 
 void LinksTest::externalLinksAndStaleFrames()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     QSignalSpy external(&preview, &TexpressoPreview::externalLinkRequested);
     preview.setCapabilities({{"links", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, true, 0});
@@ -128,7 +129,7 @@ void LinksTest::externalLinksAndStaleFrames()
 
 void LinksTest::internalDestinations()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     QSignalSpy reveals(&preview, &TexpressoPreview::reveal);
     QSignalSpy failures(&preview, &TexpressoPreview::failed);
     preview.setCapabilities({{"links", true}}); preview.setActive(true);
@@ -144,7 +145,7 @@ void LinksTest::internalDestinations()
     // The engine can compile ahead while resolving a previously unseen target.
     preview.message({"preview-state", 1, 0, 3, true, 0});
     preview.message({"preview-destination", 1, 0, "later", 2});
-    QCOMPARE(preview.page(), 2); QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-render"));
+    QCOMPARE(preview.page(), 2); QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-surface"));
     deliver(preview, lastCommand(commands), annotations({}, "later"));
     QTRY_VERIFY(preview.valid()); QTRY_COMPARE(reveals.size(), 1);
     QCOMPARE(reveals[0][0].toPointF(), QPointF(40, 100));
@@ -160,7 +161,7 @@ void LinksTest::internalDestinations()
 void LinksTest::interruptedDestinations()
 {
     for (int interruption = 0; interruption < 3; ++interruption) {
-        TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+        TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
         QSignalSpy reveals(&preview, &TexpressoPreview::reveal);
         preview.setCapabilities({{"links", true}}); preview.setActive(true);
         preview.message({"preview-state", 1, 0, 3, true, 0});
@@ -179,7 +180,7 @@ void LinksTest::interruptedDestinations()
 
 void LinksTest::inactiveLinksAndDestinationTimeout()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     QSignalSpy external(&preview, &TexpressoPreview::externalLinkRequested);
     QSignalSpy failures(&preview, &TexpressoPreview::failed);
     preview.setCapabilities({{"links", true}}); preview.setActive(true);
@@ -204,14 +205,14 @@ void LinksTest::inactiveLinksAndDestinationTimeout()
 
 void LinksTest::cachedAndBackgroundLinks()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     QSignalSpy external(&preview, &TexpressoPreview::externalLinkRequested);
     preview.setCapabilities({{"links", true}, {"backgroundRendering", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 3, true, 0});
     const auto first = annotations({"https://example.com/first"});
     const auto second = annotations({"https://example.com/second"});
     deliver(preview, lastCommand(commands), first); QTRY_VERIFY(preview.valid());
-    preview.setViewportPages({0, 1}); QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-background"));
+    preview.setViewportPages({0, 1}); QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-surface"));
     deliver(preview, lastCommand(commands), second); QTRY_VERIFY(preview.pageValid(1));
     QCOMPARE(preview.page(), 0); QCOMPARE(preview.annotationsForPage(1), second);
     preview.activateLink(1, 0, 1, 0); QCOMPARE(external.size(), 1);
@@ -225,19 +226,19 @@ void LinksTest::cachedAndBackgroundLinks()
 
 void LinksTest::emptyPatchUpdatesAnnotations()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(16); QSignalSpy commands(&preview, &TexpressoPreview::command);
     QSignalSpy external(&preview, &TexpressoPreview::externalLinkRequested);
     preview.setCapabilities({{"links", true}, {"pngPatches", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, true, 0});
     deliver(preview, lastCommand(commands), annotations({"https://example.com/old"}), 11); QTRY_VERIFY(preview.valid());
     const auto pixels = preview.image();
     preview.sourceChanged(1); preview.message({"preview-state", 2, 1, 1, true, 0});
-    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-png"));
+    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-surface"));
     auto header = frameHeader(0); header["requestId"] = request[1];
     header["revision"] = 2; header["sequence"] = 1;
     header["rasterId"] = 12; header["patch"] = QJsonObject{{"base", 11}, {"rect", QJsonArray{0, 0, 0, 0}}};
     const auto next = annotations({"https://example.com/new"}); header["annotations"] = next;
-    preview.receive(header, {}); QTRY_COMPARE(preview.annotationsForPage(0), next);
+    receiveTestSurface(preview, request, header, {}); QTRY_COMPARE(preview.annotationsForPage(0), next);
     QCOMPARE(preview.image(), pixels); preview.activateLink(0, 0, 2, 1); QCOMPARE(external.size(), 1);
     QCOMPARE(external[0][0].toUrl(), QUrl("https://example.com/new"));
 }

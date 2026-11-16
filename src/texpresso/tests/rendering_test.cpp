@@ -1,6 +1,8 @@
 #include <QtTest>
+#include "surface_fixture.h"
 #include "texpressopreview.h"
 #include "texpressoprocess.h"
+#include "texpressoprotocol.h"
 #include "texpressowidget.h"
 #include <QBuffer>
 #include <QTemporaryDir>
@@ -11,9 +13,12 @@ class RenderingTest : public QObject
 {
     Q_OBJECT
 private slots:
+    void surfacePlanning();
+    void viewportScrollReuse();
+    void croppedCanvasPlacement();
     void patchesAndKeyframeRecovery();
     void latestRegionAndSourceFence();
-    void unsupportedFeatures();
+    void surfaceCommand();
     void asynchronousMagnifier();
     void externalBuildDisablesInteractions();
     void realEngine();
@@ -21,6 +26,87 @@ private slots:
     void preciseCachedSourceSearch();
     void retinaResolution();
 };
+void RenderingTest::surfacePlanning()
+{
+    const QRectF page(10, 20, 600, 900);
+    const auto large = TexpressoSurface::plan(24000, page, QRect(17000, 22000, 1400, 1000));
+    QCOMPARE(large.grid, QSize(24000, 36000));
+    QVERIFY(large.clip.contains(QRect(17000, 22000, 1400, 1000)));
+    QVERIFY(qint64(large.clip.width()) * large.clip.height() <= TexpressoProtocol::maxPixels);
+    const auto capped = TexpressoSurface::plan(65536, page);
+    QCOMPARE(capped.grid.width(), 65536); // The allocation cap never lowers density.
+    QVERIFY(capped.clip.width() <= 8192 && capped.clip.height() <= 8192);
+    QVERIFY(qint64(capped.clip.width()) * capped.clip.height() <= TexpressoProtocol::maxPixels);
+    const auto points = large.pageRect(page);
+    QCOMPARE(points.topLeft(), page.topLeft() + QPointF(large.clip.topLeft()) / 40);
+}
+void RenderingTest::viewportScrollReuse()
+{
+    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    preview.setViewport({{0, 12000, QRect(7000, 9000, 600, 700)}});
+    preview.setActive(true); preview.message({"preview-state", 1, 0, 1, true, 0});
+    const auto reply = [&](const QJsonArray &request, Qt::GlobalColor color) {
+        QImage image(2, 2, QImage::Format_RGB32); image.fill(color);
+        QByteArray bytes; QBuffer buffer(&bytes); buffer.open(QIODevice::WriteOnly); image.save(&buffer, "PNG");
+        receiveTestSurface(preview, request, {{"requestId", request[1]}, {"revision", 1}, {"sequence", 0}, {"page", 0},
+            {"bounds", QJsonArray{0, 0, 600, 900}}, {"mime", "image/png"}, {"byteLength", bytes.size()}}, bytes);
+    };
+    const auto first = commands.last()[0].toJsonArray(); reply(first, Qt::red);
+    QTRY_VERIFY(preview.valid());
+    QCOMPARE(preview.surface().grid, QSize(12000, 18000));
+    QVERIFY(preview.image().height() < 2000);
+    const auto retained = preview.image(); const auto sent = commands.size();
+    preview.setViewport({{0, 12000, QRect(7040, 9040, 600, 700)}});
+    QCOMPARE(commands.size(), sent); // Reuse overscan during ordinary scrolling.
+    preview.setViewport({{0, 12000, QRect(2000, 3000, 600, 700)}});
+    QCOMPARE(commands.size(), sent + 1);
+    QCOMPARE(preview.image(), retained); // Keep the last good surface while waiting.
+    const auto pending = commands.last()[0].toJsonArray();
+    preview.setViewport({{0, 24000, QRect(4000, 6000, 1200, 1400)}});
+    const auto sharp = commands.last()[0].toJsonArray();
+    QCOMPARE(sharp[3].toInt(), 24000);
+    reply(pending, Qt::blue); QTest::qWait(10); QCOMPARE(preview.image(), retained);
+    reply(sharp, Qt::green); QTRY_COMPARE(preview.surface().grid.width(), 24000);
+    QCOMPARE(preview.image().pixelColor(0, 0), QColor(Qt::green));
+    QCOMPARE(preview.bounds(), QRectF(0, 0, 600, 900));
+    preview.message({"preview-state", 1, 0, 2, true, 0});
+    QTRY_COMPARE(commands.last()[0].toJsonArray()[13].toInt(), 1);
+    const auto neighbor = commands.last()[0].toJsonArray();
+    QCOMPARE(neighbor[2].toInt(), 1); QCOMPARE(neighbor[3].toInt(), 24000);
+    QVERIFY(neighbor[8].toInt() - neighbor[6].toInt() <= 2048);
+    QVERIFY(neighbor[9].toInt() - neighbor[7].toInt() <= 2048);
+}
+void RenderingTest::croppedCanvasPlacement()
+{
+    PDFDocumentConfig config{}; config.editTool = 2;
+    QScrollArea area; QWidget container; TexpressoCanvas canvas(&config, &area);
+    canvas.resize(600, 900); canvas.pageBounds = QRectF(0, 0, 600, 900); canvas.scale = 1;
+    const auto dpr = canvas.devicePixelRatioF();
+    canvas.pixelSurface = {QSize(qRound(600 * dpr), qRound(900 * dpr)),
+        QRect(qRound(100 * dpr), qRound(150 * dpr), qRound(200 * dpr), qRound(250 * dpr))};
+    canvas.pixels = QImage(canvas.pixelSurface.clip.size(), QImage::Format_RGB32); canvas.pixels.fill(Qt::blue);
+    QImage painted(QSize(qRound(600 * dpr), qRound(900 * dpr)), QImage::Format_RGB32); painted.setDevicePixelRatio(dpr);
+    canvas.render(&painted);
+    QCOMPARE(painted.pixelColor(qRound(150 * dpr), qRound(200 * dpr)), QColor(Qt::blue));
+    QCOMPARE(painted.pixelColor(qRound(10 * dpr), qRound(10 * dpr)), QColor(Qt::white));
+    QCOMPARE(painted.pixelColor(qRound(350 * dpr), qRound(200 * dpr)), QColor(Qt::white));
+    const QPointF screen = (QPointF(canvas.mapToGlobal(QPoint())) + canvas.pageOrigin()) * dpr;
+    QVERIFY(std::abs(screen.x() - std::round(screen.x())) < 1e-6);
+    QVERIFY(std::abs(screen.y() - std::round(screen.y())) < 1e-6);
+    QCOMPARE(canvas.imageRect().width() * dpr, double(canvas.pixels.width()));
+    // A toolbar-like offset has a fractional device origin at DPR 1.25/1.5.
+    // Preserve single-pixel stripes when the complete widget tree is painted.
+    container.resize(640, 970); canvas.setParent(&container); canvas.move(3, 37); canvas.show();
+    for (int y = 0; y < canvas.pixels.height(); ++y)
+        for (int x = 0; x < canvas.pixels.width(); ++x)
+            canvas.pixels.setPixelColor(x, y, (x + y) % 2 ? Qt::black : Qt::white);
+    QImage capture(QSize(qRound(640 * dpr), qRound(970 * dpr)), QImage::Format_RGB32); capture.setDevicePixelRatio(dpr);
+    container.render(&capture);
+    const QPoint origin(qRound((canvas.x() + canvas.pageOrigin().x()) * dpr) + canvas.pixelSurface.clip.x(),
+        qRound((canvas.y() + canvas.pageOrigin().y()) * dpr) + canvas.pixelSurface.clip.y());
+    for (int y = 20; y < 40; ++y) for (int x = 20; x < 40; ++x)
+        QCOMPARE(capture.pixelColor(origin + QPoint(x, y)), canvas.pixels.pixelColor(x, y));
+}
 void RenderingTest::retinaResolution()
 {
     const auto engine = qEnvironmentVariable("TEXPRESSO_TEST_ENGINE");
@@ -51,6 +137,13 @@ void RenderingTest::retinaResolution()
     QTRY_VERIFY_WITH_TIMEOUT(preview.sequence() > sequence && preview.valid(), 15000);
     QCOMPARE(preview.image().width(), 3200); // A changed page still decodes/composes at Retina size.
     QVERIFY(preview.image() != beforeEdit);
+    // Zoom density exceeds both the former 4096-width ceiling and the full-page
+    // allocation budget. Only the requested neighborhood should be decoded.
+    preview.setViewport({{0, 12000, QRect(1500, 1700, 800, 900)}});
+    QTRY_COMPARE_WITH_TIMEOUT(preview.surface().grid.width(), 12000, 15000);
+    QVERIFY(preview.surface().clip.contains(QRect(1500, 1700, 800, 900)));
+    QVERIFY(preview.image().width() <= 2048 && preview.image().height() <= 2048);
+    QVERIFY(preview.valid());
     manager.shutdown();
 }
 static QByteArray png(const QImage &image)
@@ -59,23 +152,23 @@ static QByteArray png(const QImage &image)
 }
 static QJsonObject frame(TexpressoPreview &preview, const QJsonArray &request, const QByteArray &bytes, QSize size = {8, 8})
 {
-    return {{"requestId", request[1]}, {"revision", double(preview.revision())}, {"sequence", double(preview.sequence())},
+    return testSurfaceHeader({{"requestId", request[1]}, {"revision", double(preview.revision())}, {"sequence", double(preview.sequence())},
         {"page", preview.page()}, {"width", size.width()}, {"height", size.height()}, {"bounds", QJsonArray{0, 0, 80, 80}},
-        {"mime", "image/png"}, {"byteLength", bytes.size()}};
+        {"mime", "image/png"}, {"byteLength", bytes.size()}}, request);
 }
 static QJsonArray lastCommand(const QSignalSpy &commands) { return commands.last()[0].toJsonArray(); }
 void RenderingTest::patchesAndKeyframeRecovery()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(8); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"pngPatches", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, true, 0});
-    QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-png"));
-    QCOMPARE(lastCommand(commands)[6].toInt(), 0);
+    QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-surface"));
+    QCOMPARE(lastCommand(commands)[12].toInt(), 0);
     QImage red(8, 8, QImage::Format_RGB32); red.fill(Qt::red);
     const auto bytes = png(red); auto h = frame(preview, lastCommand(commands), bytes); h["rasterId"] = 1;
     preview.receive(h, bytes); QTRY_VERIFY(preview.valid());
     preview.sourceChanged(1); preview.message({"preview-state", 2, 1, 1, true, 0});
-    QCOMPARE(lastCommand(commands)[6].toInt(), 1);
+    QCOMPARE(lastCommand(commands)[12].toInt(), 1);
     QImage blue(2, 3, QImage::Format_RGB32); blue.fill(Qt::blue);
     const auto patch = png(blue); h = frame(preview, lastCommand(commands), patch); h["rasterId"] = 2;
     h["patch"] = QJsonObject{{"base", 1}, {"rect", QJsonArray{3, 2, 2, 3}}};
@@ -92,18 +185,18 @@ void RenderingTest::patchesAndKeyframeRecovery()
     h = frame(preview, lastCommand(commands), patch); h["rasterId"] = 4;
     h["patch"] = QJsonObject{{"base", 999}, {"rect", QJsonArray{3, 2, 2, 3}}};
     preview.receive(h, patch);
-    QCOMPARE(lastCommand(commands)[6].toInt(), 0); QVERIFY(!preview.valid());
+    QCOMPARE(lastCommand(commands)[12].toInt(), 0); QVERIFY(!preview.valid());
     h = frame(preview, lastCommand(commands), bytes); h["rasterId"] = 5;
     preview.receive(h, bytes); QTRY_VERIFY(preview.valid()); QCOMPARE(preview.image(), red);
     // Matching raster IDs alone cannot authorize a patch for different geometry.
     preview.sourceChanged(4); preview.message({"preview-state", 5, 4, 1, true, 0});
     h = frame(preview, lastCommand(commands), patch); h["rasterId"] = 6; h["bounds"] = QJsonArray{0, 0, 81, 80};
     h["patch"] = QJsonObject{{"base", 5}, {"rect", QJsonArray{3, 2, 2, 3}}};
-    preview.receive(h, patch); QCOMPARE(lastCommand(commands)[6].toInt(), 0);
+    preview.receive(h, patch); QCOMPARE(lastCommand(commands)[12].toInt(), 0);
 }
 void RenderingTest::latestRegionAndSourceFence()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(8); QSignalSpy commands(&preview, &TexpressoPreview::command);
     QSignalSpy regions(&preview, &TexpressoPreview::regionReady);
     preview.setCapabilities({{"regions", true}, {"pngPatches", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 2, true, 0});
@@ -111,34 +204,32 @@ void RenderingTest::latestRegionAndSourceFence()
     auto h = frame(preview, lastCommand(commands), bytes); h["rasterId"] = 1;
     preview.receive(h, bytes); QTRY_VERIFY(preview.valid()); const auto page = preview.image();
     preview.requestRegion({10, 10, 20, 20}, 100, 1); const auto first = lastCommand(commands);
-    QCOMPARE(first[0].toString(), QString("preview-region"));
+    QCOMPARE(first[0].toString(), QString("preview-surface"));
     for (int token = 2; token <= 100; ++token) preview.requestRegion({20, 20, 20, 20}, 100, token);
     QCOMPARE(commands.size(), 2); // one native export and only the latest queued lens position
-    h = frame(preview, first, bytes); preview.receive(h, bytes);
+    h = frame(preview, first, bytes); receiveTestSurface(preview, first, h, bytes);
     QTRY_COMPARE(commands.size(), 3); QCOMPARE(regions.size(), 0);
-    h = frame(preview, lastCommand(commands), bytes); preview.receive(h, bytes);
+    h = frame(preview, lastCommand(commands), bytes); receiveTestSurface(preview, lastCommand(commands), h, bytes);
     QTRY_COMPARE(regions.size(), 1); QCOMPARE(regions[0][0].toLongLong(), 100);
     QCOMPARE(preview.image().cacheKey(), page.cacheKey());
     preview.inverse({30, 30}); QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-inverse"));
     preview.requestRegion({10, 10, 20, 20}, 100, 101); h = frame(preview, lastCommand(commands), bytes);
-    preview.receive(h, bytes); preview.sourceChanged(1); QTest::qWait(30); QCOMPARE(regions.size(), 1);
-    preview.message({"preview-state", 2, 1, 2, true, 0}); QCOMPARE(lastCommand(commands)[6].toInt(), 1);
+    receiveTestSurface(preview, lastCommand(commands), h, bytes); preview.sourceChanged(1); QTest::qWait(30); QCOMPARE(regions.size(), 1);
+    preview.message({"preview-state", 2, 1, 2, true, 0}); QCOMPARE(lastCommand(commands)[12].toInt(), 1);
     h = frame(preview, lastCommand(commands), bytes); h["rasterId"] = 10; preview.receive(h, bytes); QTRY_VERIFY(preview.valid());
     preview.requestRegion({10, 10, 20, 20}, 100, 102); h = frame(preview, lastCommand(commands), bytes);
-    preview.cancelRegion(); preview.receive(h, bytes); QTest::qWait(30); QCOMPARE(regions.size(), 1);
+    preview.cancelRegion(); receiveTestSurface(preview, lastCommand(commands), h, bytes); QTest::qWait(30); QCOMPARE(regions.size(), 1);
 }
-void RenderingTest::unsupportedFeatures()
+void RenderingTest::surfaceCommand()
 {
     TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setActive(true); preview.message({"preview-state", 1, 0, 1, true, 0});
-    QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-render"));
-    QImage red(8, 8, QImage::Format_RGB32); red.fill(Qt::red); const auto bytes = png(red);
-    preview.receive(frame(preview, lastCommand(commands), bytes), bytes); QTRY_VERIFY(preview.valid());
-    preview.requestRegion({10, 10, 20, 20}, 100, 1); QCOMPARE(commands.size(), 1);
+    QCOMPARE(lastCommand(commands)[0].toString(), QString("preview-surface"));
+    QCOMPARE(lastCommand(commands).size(), 14); // No legacy rendering negotiation.
 }
 void RenderingTest::asynchronousMagnifier()
 {
-    TexpressoPreview preview; QSignalSpy commands(&preview, &TexpressoPreview::command);
+    TexpressoPreview preview; preview.setWidth(8); QSignalSpy commands(&preview, &TexpressoPreview::command);
     preview.setCapabilities({{"regions", true}}); preview.setActive(true);
     preview.message({"preview-state", 1, 0, 1, true, 0});
     QImage red(8, 8, QImage::Format_RGB32); red.fill(Qt::red); const auto bytes = png(red);
@@ -155,17 +246,17 @@ void RenderingTest::asynchronousMagnifier()
     auto lens = canvas->findChild<PDFMagnifier *>(); QVERIFY(lens && lens->isVisible());
     const auto color = [&] { const auto image = lens->grab().toImage(); return image.pixelColor(image.width() / 2, image.height() / 2); };
     QCOMPARE(color(), QColor(Qt::red)); // immediate crop while the native export is pending
-    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-region"));
+    const auto request = lastCommand(commands); QCOMPARE(request[0].toString(), QString("preview-surface"));
     QImage blue(8, 8, QImage::Format_RGB32); blue.fill(Qt::blue); const auto detail = png(blue);
-    auto h = frame(preview, request, detail); h["bounds"] = QJsonArray{request[6], request[7], request[8], request[9]};
-    preview.receive(h, detail); QTRY_COMPARE(color(), QColor(Qt::blue));
+    auto h = frame(preview, request, detail);
+    receiveTestSurface(preview, request, h, detail); QTRY_COMPARE(color(), QColor(Qt::blue));
     config.grayscale = true; config.invertColors = true; lens->update();
     const auto converted = convertImage(QPixmap::fromImage(blue), true, true).toImage();
     QCOMPARE(color(), converted.pixelColor(0, 0));
     // A fresh native frame arriving after a source edit must not reach the lens.
     QTest::mouseMove(canvas, point + QPoint(10, 10)); const auto obsolete = lastCommand(commands);
-    h = frame(preview, obsolete, bytes); h["bounds"] = QJsonArray{obsolete[6], obsolete[7], obsolete[8], obsolete[9]};
-    preview.receive(h, bytes); preview.sourceChanged(1); canvas->fresh = false; canvas->resetTools();
+    h = frame(preview, obsolete, bytes);
+    receiveTestSurface(preview, lastCommand(commands), h, bytes); preview.sourceChanged(1); canvas->fresh = false; canvas->resetTools();
     QTest::qWait(30); QVERIFY(!lens->isVisible());
 }
 void RenderingTest::externalBuildDisablesInteractions()
@@ -200,7 +291,7 @@ void RenderingTest::cachedInverseUsesPublishedSourceMap()
     QTemporaryDir dir; const auto root = dir.filePath("main.tex");
     QFile file(root); QVERIFY(file.open(QIODevice::WriteOnly));
     file.write("\\documentclass{article}\n\\pagestyle{empty}\n\\begin{document}\nFirst source line.\n\\newpage\nSecond source line.\n\\newpage\nThird source line.\n\\end{document}\n"); file.close();
-    TexpressoProcess process; TexpressoPreview preview; QString diagnostics;
+    TexpressoProcess process; TexpressoPreview preview; preview.setWidth(8); QString diagnostics;
     QSignalSpy images(&process, &TexpressoProcess::image), messages(&process, &TexpressoProcess::message), commands(&preview, &TexpressoPreview::command);
     connect(&process, &TexpressoProcess::diagnostic, &preview, [&](const QString &text) { diagnostics += text; });
     connect(&process, &TexpressoProcess::ready, &preview, [&](QJsonObject capabilities) {
