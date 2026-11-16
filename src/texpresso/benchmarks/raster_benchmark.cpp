@@ -36,11 +36,14 @@ static QJsonObject rss(qint64 nativePid) {
 }
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
-    if (argc != 5) { std::cerr << "engine fixture.pdf pixel-budget artifact-prefix\n"; return 1; }
+    if (argc != 5 && argc != 7) { std::cerr << "engine fixture.pdf pixel-budget artifact-prefix [viewport-width viewport-height]\n"; return 1; }
     const QString engine = QString::fromLocal8Bit(argv[1]), pdf = QString::fromLocal8Bit(argv[2]);
     const int budget = QString::fromLocal8Bit(argv[3]).toInt();
     const QString artifacts = QString::fromLocal8Bit(argv[4]);
+    const QSize viewport = argc == 7 ? QSize(QString::fromLocal8Bit(argv[5]).toInt(), QString::fromLocal8Bit(argv[6]).toInt()) : QSize();
+    if (argc == 7 && (viewport.width() < 1 || viewport.height() < 1)) return 1;
     TexpressoProcess process; TexpressoPreview preview;
+    preview.setPreparationPending(true); // Measure requested publications without speculative neighbors.
     QString failure; QJsonObject capabilities, header; QByteArray png;
     QObject::connect(&process, &TexpressoProcess::ready, [&](const QJsonObject &features) {
         capabilities = features; preview.setCapabilities(features); preview.setActive(true);
@@ -57,15 +60,20 @@ int main(int argc, char **argv) {
     if (!waitFor(ready) || !failure.isEmpty()) { std::cerr << failure.toStdString(); return 2; }
     QJsonArray cases;
     for (const int width : {1200, 1800, 2240, 3200, 4096}) {
-        preview.setWidth(width); if (!waitFor(ready) || !failure.isEmpty()) return 3;
+        const auto selectPage = [&](int page) {
+            if (viewport.isEmpty()) preview.setPage(page);
+            else preview.setViewport({{page, width, QRect(QPoint(), QSize(std::min(width, viewport.width()), viewport.height()))}});
+        };
+        if (viewport.isEmpty()) preview.setWidth(width); else selectPage(preview.page());
+        if (!waitFor(ready) || !failure.isEmpty()) return 3;
         QVector<double> elapsed[3], native[3], payload[3], qtRss[3], nativeRss[3];
         QSize sizes[3]; qint64 decodedBytes[3]{};
         // Two warmups per page, then seven independent uncached publications.
         for (int round = 0; round < 9; ++round) for (int page = 0; page < 3; ++page) {
             preview.releaseCache();
             // Alternate pages: setPage on an already valid current page is a no-op.
-            if (preview.page() == page) { preview.setPage((page+1)%3); if (!waitFor(ready)) return 4; preview.releaseCache(); }
-            QElapsedTimer timer; timer.start(); preview.setPage(page);
+            if (preview.page() == page) { selectPage((page+1)%3); if (!waitFor(ready)) return 4; preview.releaseCache(); }
+            QElapsedTimer timer; timer.start(); selectPage(page);
             if (!waitFor(ready) || !failure.isEmpty()) { std::cerr << failure.toStdString(); return 5; }
             const auto ms = timer.nsecsElapsed() / 1e6;
             if (header["page"].toInt() != page) return 6;
@@ -76,7 +84,7 @@ int main(int argc, char **argv) {
                 if (memory.isEmpty()) return 7;
                 qtRss[page].append(memory["qtBytes"].toDouble()); nativeRss[page].append(memory["nativeBytes"].toDouble());
             }
-            if (round == 8 && page == 0 && width == 2240) {
+            if (viewport.isEmpty() && round == 8 && page == 0 && width == 2240) {
                 // Same physical destination pixels, showing the old upscale.
                 const QSize target(width, qRound(width * preview.bounds().height() / preview.bounds().width()));
                 QImage image(target, QImage::Format_RGB32); image.fill(Qt::white);
@@ -94,6 +102,6 @@ int main(int argc, char **argv) {
     process.stop(); waitFor([&] { return !process.running(); });
     const auto hash = [](const QString &path) { QFile f(path); if (!f.open(QIODevice::ReadOnly)) return QString(); return QString::fromLatin1(QCryptographicHash::hash(f.readAll(), QCryptographicHash::Sha256).toHex()); };
     std::cout << QJsonDocument(QJsonObject{{"engine", engine}, {"engineSha256", hash(engine)}, {"fixtureSha256", hash(pdf)},
-        {"requestedBudget", budget}, {"capabilities", capabilities}, {"qtVersion", qVersion()}, {"cases", cases},
+        {"requestedBudget", budget}, {"viewport", QJsonArray{viewport.width(), viewport.height()}}, {"capabilities", capabilities}, {"qtVersion", qVersion()}, {"cases", cases},
         {"method", "Serial precompiled-PDF text/math, vectors, noisy RGB image; two warmups and seven samples/page/width. Qt cache cleared before each request; native PDF engine has no export content token. Publication includes raster/export/IPC/async Qt decode and 1ms polling, excludes widget painting. RSS sampled after publication, outside timing, excludes transient peaks/GPU. No TeX compilation in measured intervals."}}).toJson().constData();
 }

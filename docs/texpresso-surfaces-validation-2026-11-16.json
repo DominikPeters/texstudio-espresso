@@ -1,0 +1,490 @@
+{
+  "baselineClientCommit": "0946e3989e8377562554ac5f0186a28fdd1f2257",
+  "surfaceClientCommit": "66165d6ce0ee6421c85bd39faa90b019e4a907f5",
+  "benchmarkSourceSha256": "f09624157e29d8a014f2ca8bb6c6c2c86e17af7b0a9c1c46397a3fb516a57b9a",
+  "baselineExecutableSha256": "f3575d312baebccbf6c8d6d82c57d961da13f63be1456cb2ecf8338f21142fd5",
+  "surfaceExecutableSha256": "4509b398be3f93e1dc70f204ec7cf0931bc5bf37a8dad3cdf767e4e9c2319c4e",
+  "buildType": "Release, both clients, same Qt and same native engine/dependencies, serial runs",
+  "platform": "macOS-15.7.9-arm64-arm-64bit",
+  "engineSha256": "7f165c7a7575e758611f8cc95afe10885fcbc2b2782e07e6384a3227e2c32e09",
+  "engineCommit": "87e1cbbcc99e0f6a6037569b5204ff4dc057596f",
+  "fixtureSha256": "0d2748a62a434b16b35abaea3d9846e51ce0d320b612522963aed7a1ba7dcb99",
+  "qtVersion": "6.12.0",
+  "viewport": [
+    2000,
+    1400
+  ],
+  "budgetPixels": 16000000,
+  "method": "Baseline/surface/surface/baseline, serial after builds/tests finished. Same updated engine and dependency build for both Release Qt clients. Two warmups then seven samples per page/width in each run. Precompiled public synthetic PDF; Qt cache cleared. Includes export, IPC, asynchronous decode and 1 ms polling; excludes compilation and widget painting. Overscan and canonical-cell alignment included. At width 4096 the legacy page is downsampled to its 16 MP cap; the cropped surface retains requested density. Memory numbers describe one decoded image, not process footprint.",
+  "cases": [
+    {
+      "gridWidth": 1200,
+      "page": 0,
+      "content": "text and math",
+      "baseline": {
+        "publicationMedianMs": 12.039,
+        "publicationP95Ms": 13.075,
+        "samples": 14,
+        "imagePixels": [
+          1200,
+          1698
+        ],
+        "decodedMiB": 1.943,
+        "nativeExportMedianMs": 4.631
+      },
+      "surfaces": {
+        "publicationMedianMs": 12.031,
+        "publicationP95Ms": 13.192,
+        "samples": 14,
+        "imagePixels": [
+          1200,
+          1698
+        ],
+        "decodedMiB": 1.943,
+        "nativeExportMedianMs": 4.816
+      }
+    },
+    {
+      "gridWidth": 1200,
+      "page": 1,
+      "content": "vectors",
+      "baseline": {
+        "publicationMedianMs": 15.854,
+        "publicationP95Ms": 17.089,
+        "samples": 14,
+        "imagePixels": [
+          1200,
+          1698
+        ],
+        "decodedMiB": 7.773,
+        "nativeExportMedianMs": 4.319
+      },
+      "surfaces": {
+        "publicationMedianMs": 15.693,
+        "publicationP95Ms": 16.983,
+        "samples": 14,
+        "imagePixels": [
+          1200,
+          1698
+        ],
+        "decodedMiB": 7.773,
+        "nativeExportMedianMs": 4.618
+      }
+    },
+    {
+      "gridWidth": 1200,
+      "page": 2,
+      "content": "noisy RGB image",
+      "baseline": {
+        "publicationMedianMs": 82.493,
+        "publicationP95Ms": 83.58,
+        "samples": 14,
+        "imagePixels": [
+          1200,
+          1698
+        ],
+        "decodedMiB": 7.773,
+        "nativeExportMedianMs": 31.493
+      },
+      "surfaces": {
+        "publicationMedianMs": 82.877,
+        "publicationP95Ms": 83.814,
+        "samples": 14,
+        "imagePixels": [
+          1200,
+          1698
+        ],
+        "decodedMiB": 7.773,
+        "nativeExportMedianMs": 30.98
+      }
+    },
+    {
+      "gridWidth": 1800,
+      "page": 0,
+      "content": "text and math",
+      "baseline": {
+        "publicationMedianMs": 18.28,
+        "publicationP95Ms": 19.703,
+        "samples": 14,
+        "imagePixels": [
+          1800,
+          2546
+        ],
+        "decodedMiB": 4.37,
+        "nativeExportMedianMs": 8.127
+      },
+      "surfaces": {
+        "publicationMedianMs": 17.839,
+        "publicationP95Ms": 18.596,
+        "samples": 14,
+        "imagePixels": [
+          1800,
+          2048
+        ],
+        "decodedMiB": 3.516,
+        "nativeExportMedianMs": 7.625
+      }
+    },
+    {
+      "gridWidth": 1800,
+      "page": 1,
+      "content": "vectors",
+      "baseline": {
+        "publicationMedianMs": 27.448,
+        "publicationP95Ms": 28.133,
+        "samples": 14,
+        "imagePixels": [
+          1800,
+          2546
+        ],
+        "decodedMiB": 17.482,
+        "nativeExportMedianMs": 7.511
+      },
+      "surfaces": {
+        "publicationMedianMs": 24.535,
+        "publicationP95Ms": 25.657,
+        "samples": 14,
+        "imagePixels": [
+          1800,
+          2048
+        ],
+        "decodedMiB": 14.062,
+        "nativeExportMedianMs": 7.223
+      }
+    },
+    {
+      "gridWidth": 1800,
+      "page": 2,
+      "content": "noisy RGB image",
+      "baseline": {
+        "publicationMedianMs": 177.774,
+        "publicationP95Ms": 179.84,
+        "samples": 14,
+        "imagePixels": [
+          1800,
+          2546
+        ],
+        "decodedMiB": 17.482,
+        "nativeExportMedianMs": 59.144
+      },
+      "surfaces": {
+        "publicationMedianMs": 173.109,
+        "publicationP95Ms": 174.172,
+        "samples": 14,
+        "imagePixels": [
+          1800,
+          2048
+        ],
+        "decodedMiB": 14.062,
+        "nativeExportMedianMs": 58.159
+      }
+    },
+    {
+      "gridWidth": 2240,
+      "page": 0,
+      "content": "text and math",
+      "baseline": {
+        "publicationMedianMs": 26.739,
+        "publicationP95Ms": 28.222,
+        "samples": 14,
+        "imagePixels": [
+          2240,
+          3168
+        ],
+        "decodedMiB": 6.768,
+        "nativeExportMedianMs": 13.412
+      },
+      "surfaces": {
+        "publicationMedianMs": 22.372,
+        "publicationP95Ms": 23.219,
+        "samples": 14,
+        "imagePixels": [
+          2240,
+          2048
+        ],
+        "decodedMiB": 4.375,
+        "nativeExportMedianMs": 10.878
+      }
+    },
+    {
+      "gridWidth": 2240,
+      "page": 1,
+      "content": "vectors",
+      "baseline": {
+        "publicationMedianMs": 39.407,
+        "publicationP95Ms": 40.859,
+        "samples": 14,
+        "imagePixels": [
+          2240,
+          3168
+        ],
+        "decodedMiB": 27.07,
+        "nativeExportMedianMs": 12.498
+      },
+      "surfaces": {
+        "publicationMedianMs": 29.827,
+        "publicationP95Ms": 30.544,
+        "samples": 14,
+        "imagePixels": [
+          2240,
+          2048
+        ],
+        "decodedMiB": 17.5,
+        "nativeExportMedianMs": 9.344
+      }
+    },
+    {
+      "gridWidth": 2240,
+      "page": 2,
+      "content": "noisy RGB image",
+      "baseline": {
+        "publicationMedianMs": 276.523,
+        "publicationP95Ms": 277.987,
+        "samples": 14,
+        "imagePixels": [
+          2240,
+          3168
+        ],
+        "decodedMiB": 27.07,
+        "nativeExportMedianMs": 93.093
+      },
+      "surfaces": {
+        "publicationMedianMs": 220.477,
+        "publicationP95Ms": 222.811,
+        "samples": 14,
+        "imagePixels": [
+          2240,
+          2048
+        ],
+        "decodedMiB": 17.5,
+        "nativeExportMedianMs": 74.424
+      }
+    },
+    {
+      "gridWidth": 3200,
+      "page": 0,
+      "content": "text and math",
+      "baseline": {
+        "publicationMedianMs": 43.17,
+        "publicationP95Ms": 43.74,
+        "samples": 14,
+        "imagePixels": [
+          3200,
+          4526
+        ],
+        "decodedMiB": 13.812,
+        "nativeExportMedianMs": 24.409
+      },
+      "surfaces": {
+        "publicationMedianMs": 21.564,
+        "publicationP95Ms": 23.324,
+        "samples": 14,
+        "imagePixels": [
+          2560,
+          2048
+        ],
+        "decodedMiB": 5.0,
+        "nativeExportMedianMs": 10.73
+      }
+    },
+    {
+      "gridWidth": 3200,
+      "page": 1,
+      "content": "vectors",
+      "baseline": {
+        "publicationMedianMs": 72.032,
+        "publicationP95Ms": 73.964,
+        "samples": 14,
+        "imagePixels": [
+          3200,
+          4526
+        ],
+        "decodedMiB": 55.249,
+        "nativeExportMedianMs": 22.64
+      },
+      "surfaces": {
+        "publicationMedianMs": 30.596,
+        "publicationP95Ms": 31.17,
+        "samples": 14,
+        "imagePixels": [
+          2560,
+          2048
+        ],
+        "decodedMiB": 20.0,
+        "nativeExportMedianMs": 9.67
+      }
+    },
+    {
+      "gridWidth": 3200,
+      "page": 2,
+      "content": "noisy RGB image",
+      "baseline": {
+        "publicationMedianMs": 558.81,
+        "publicationP95Ms": 570.788,
+        "samples": 14,
+        "imagePixels": [
+          3200,
+          4526
+        ],
+        "decodedMiB": 55.249,
+        "nativeExportMedianMs": 190.431
+      },
+      "surfaces": {
+        "publicationMedianMs": 273.426,
+        "publicationP95Ms": 275.185,
+        "samples": 14,
+        "imagePixels": [
+          2560,
+          2048
+        ],
+        "decodedMiB": 20.0,
+        "nativeExportMedianMs": 98.376
+      }
+    },
+    {
+      "gridWidth": 4096,
+      "page": 0,
+      "content": "text and math",
+      "baseline": {
+        "publicationMedianMs": 48.33,
+        "publicationP95Ms": 49.589,
+        "samples": 14,
+        "imagePixels": [
+          3363,
+          4757
+        ],
+        "decodedMiB": 15.261,
+        "nativeExportMedianMs": 26.841
+      },
+      "surfaces": {
+        "publicationMedianMs": 18.243,
+        "publicationP95Ms": 18.656,
+        "samples": 14,
+        "imagePixels": [
+          2560,
+          2048
+        ],
+        "decodedMiB": 5.0,
+        "nativeExportMedianMs": 9.25
+      }
+    },
+    {
+      "gridWidth": 4096,
+      "page": 1,
+      "content": "vectors",
+      "baseline": {
+        "publicationMedianMs": 80.958,
+        "publicationP95Ms": 81.562,
+        "samples": 14,
+        "imagePixels": [
+          3363,
+          4757
+        ],
+        "decodedMiB": 61.027,
+        "nativeExportMedianMs": 26.008
+      },
+      "surfaces": {
+        "publicationMedianMs": 28.013,
+        "publicationP95Ms": 29.792,
+        "samples": 14,
+        "imagePixels": [
+          2560,
+          2048
+        ],
+        "decodedMiB": 20.0,
+        "nativeExportMedianMs": 8.657
+      }
+    },
+    {
+      "gridWidth": 4096,
+      "page": 2,
+      "content": "noisy RGB image",
+      "baseline": {
+        "publicationMedianMs": 619.903,
+        "publicationP95Ms": 628.966,
+        "samples": 14,
+        "imagePixels": [
+          3363,
+          4757
+        ],
+        "decodedMiB": 61.027,
+        "nativeExportMedianMs": 210.016
+      },
+      "surfaces": {
+        "publicationMedianMs": 82.329,
+        "publicationP95Ms": 83.431,
+        "samples": 14,
+        "imagePixels": [
+          2560,
+          2048
+        ],
+        "decodedMiB": 20.0,
+        "nativeExportMedianMs": 24.261
+      }
+    }
+  ],
+  "architecture": "arm64",
+  "rendererDependencies": {
+    "schema": 1,
+    "texpresso": {
+      "repository": "https://github.com/DominikPeters/texpresso.git",
+      "branch": "codex/unified-engine",
+      "revisionSource": "Git submodule native/texpresso"
+    },
+    "mupdf": {
+      "version": "1.28.5",
+      "repository": "https://github.com/ArtifexSoftware/mupdf.git",
+      "revision": "8ad45e92f0935d3d87f1db3f873086472a5e1b24",
+      "submodules": {
+        "thirdparty/lcms2": "d69c64417c4a33a4629957fc0e08f4f4c5abcc3d"
+      }
+    },
+    "icu": {
+      "version": "78.3",
+      "sourceUrl": "https://github.com/unicode-org/icu/releases/download/release-78.3/icu4c-78.3-sources.tgz",
+      "sourceSha256": "3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0"
+    },
+    "zlibNg": {
+      "version": "2.3.3",
+      "repository": "https://github.com/zlib-ng/zlib-ng.git",
+      "revision": "12731092979c6d07f42da27da673a9f6c7b13586"
+    }
+  },
+  "memorySoaks": [
+    {
+      "devicePixelRatio": 1,
+      "passed": true,
+      "requestedSeconds": 300,
+      "elapsedSeconds": 330.0350041659549,
+      "targetPages": 100,
+      "externalUpdates": true,
+      "inputs": 2432,
+      "appSha256": "7d63c03be78ebaebe7e91d208a68565310373fb6d8a7634e455b0250e80cbdf1",
+      "editorFootprintSamples": 314,
+      "peakEditorFootprintKiB": 151218,
+      "finalEditorFootprintKiB": 133330,
+      "peakOwnedTasks": 42,
+      "leftoverProcesses": [],
+      "independentOracleProbes": 5,
+      "phasesWithCadenceMisses": 55
+    },
+    {
+      "devicePixelRatio": 2,
+      "passed": true,
+      "requestedSeconds": 120,
+      "elapsedSeconds": 150.03539041697513,
+      "targetPages": 100,
+      "externalUpdates": true,
+      "inputs": 1024,
+      "appSha256": "7d63c03be78ebaebe7e91d208a68565310373fb6d8a7634e455b0250e80cbdf1",
+      "editorFootprintSamples": 140,
+      "peakEditorFootprintKiB": 175554,
+      "finalEditorFootprintKiB": 159538,
+      "peakOwnedTasks": 41,
+      "leftoverProcesses": [],
+      "independentOracleProbes": 5,
+      "phasesWithCadenceMisses": 24
+    }
+  ],
+  "memoryScope": "macOS physical footprint of the editor includes compressed/swapped memory. Worker groups sampled separately; their RSS/footprint sums can double-count shared/COW checkpoint pages. These finite workloads do not prove hours-long memory stability. Cadence misses occurred, so no typing-latency claim is derived from the soaks. Independent PDF and SyncTeX oracles and owned-worker cleanup passed."
+}

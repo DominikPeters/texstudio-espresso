@@ -48,13 +48,55 @@ page grids with cropped allocations. Re-run crop placement with
 `QT_SCALE_FACTOR=1.25`, `1.5` and `2` for fractional/Retina geometry.
 The native `make test-preview-png` suite checks canonical pixel equivalence.
 
-Performance profiling and a long memory soak are deferred while the development
-machine is busy with video encoding. No speedup or whole-process memory result
-is inferred from correctness-test timings. Before release, compare this Qt path
-against its former 16-megapixel baseline using identical engine dependencies,
-and include sustained editing, scrolling, zooming and document switching.
+## Local validation, 16 November 2026
+
+All 20 offscreen Qt suites passed against engine `87e1cbb`, including real TeX,
+bibliography, source routing, links, TikZ, scrolling and pagination. Canonical
+raster tests passed, as did pixel-stripe placement at DPR 1.25, 1.5 and 2.
+The native tooling/packaging suite passed all 81 tests.
+
+The serial comparison used freshly built Release clients before/after this
+migration, the same Qt and engine/dependencies, and a precompiled public synthetic
+PDF. Both paths allowed 16 megapixels. A 2000 × 1400 device-pixel viewport was
+requested on the new path, then expanded by its normal overscan and alignment. Each value below pools
+14 samples across two runs; the order was baseline/surfaces/surfaces/baseline.
+Timings include native export, IPC and asynchronous Qt decoding, excluding TeX
+compilation and widget painting.
+
+At a 3200-pixel page grid:
+
+| Content | Previous whole-page path | Cropped surfaces |
+| --- | ---: | ---: |
+| Text and math | 43.2 ms | 21.6 ms |
+| Vectors | 72.0 ms | 30.6 ms |
+| Noisy RGB image | 558.8 ms | 273.4 ms |
+
+Each decoded image fell from 55.25 MiB to 20 MiB at that density. These are image
+allocations, not whole-process memory. At 1200 pixels, both paths rendered the
+whole page and had essentially unchanged medians (text 12.0 ms, vectors 15.7–15.9
+ms, image 82.5–82.9 ms). At 4096 pixels the previous path reduced density to fit
+16 MP, whereas surfaces retained the requested density; that comparison also
+changes visual quality. See [the measurement data](texpresso-surfaces-validation-2026-11-16.json)
+for all widths, hashes, versions, sampling and scope.
 
 Speculative neighbors use the current viewport's density and horizontal scroll
 position, retaining a viewport-sized strip at the approaching page boundary.
 They do not allocate an entire page at high zoom or introduce a coarse rendering
 mode. A later visible demand supersedes incompatible speculative geometry.
+
+Two offscreen full-editor memory soaks used disposable 100-page projects with
+background file changes and simulated external-build refreshes, alongside typing,
+scrolling, zooming, project switching, undo/redo, pause/resume and restart:
+
+| Minimum workload | Scaling | Inputs | Peak editor footprint | Final editor footprint |
+| --- | ---: | ---: | ---: | ---: |
+| 5 minutes | 1× | 2432 | 147.7 MiB | 130.2 MiB |
+| 2 minutes | 2× Retina | 1024 | 171.4 MiB | 155.8 MiB |
+
+Both passed independent clean-PDF/SyncTeX ownership checks and left no owned
+compiler processes. The macOS physical footprint includes compressed/swapped
+memory. Worker memory is separate and shared/COW checkpoints make summed RSS an
+unreliable unique-memory estimate. These finite workloads do not establish
+hours-long leak freedom. Some edit phases missed the strict cadence threshold;
+no typing-latency claim is derived from those phases. The render/decode comparison
+above was measured separately on the quiet machine.
