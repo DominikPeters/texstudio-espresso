@@ -1592,7 +1592,7 @@ bool BuildManager::prependCommandAsync(const QString &unparsedCommandLine, const
  * \param returnCmd
  * \return
  */
-bool BuildManager::runCommandAsync(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine, QString *buffer, QString *errorMsg, QObject *returnObj, const char *returnCmd)
+bool BuildManager::runCommandAsync(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine, QSharedPointer<QString> buffer, QSharedPointer<QString> errorMsg, QObject *returnObj, const char *returnCmd)
 {
     if (busyRunningCommands()) return false;
     emit clearLogs();
@@ -1627,7 +1627,7 @@ bool BuildManager::runCommandAsync(const QString &unparsedCommandLine, const QFi
     return true;
 }
 
-bool BuildManager::runCommand(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine, QString *buffer, QTextCodec *codecForBuffer , QString *errorMsg)
+bool BuildManager::runCommand(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine, QSharedPointer<QString> buffer, QTextCodec * codecForBuffer , QSharedPointer<QString> errorMsg)
 {
 	if (waitingForProcess()) return false;
 
@@ -1774,7 +1774,7 @@ bool BuildManager::checkExpandedCommands(const ExpandedCommands &expansion)
 	return true;
 }
 
-bool BuildManager::runCommandInternal(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QString *buffer, QTextCodec *codecForBuffer, QString *errorMsg)
+bool BuildManager::runCommandInternal(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QSharedPointer<QString> buffer, QTextCodec * codecForBuffer, QSharedPointer<QString> errorMsg)
 {
 	const QList<CommandToRun> &commands = expandedCommands.commands;
 
@@ -1825,8 +1825,8 @@ bool BuildManager::runCommandInternal(const ExpandedCommands &expandedCommands, 
 			if (result == LCR_NORMAL || !rerunnable) continue;
 			if (remainingReRunCount <= 0) continue; //do not abort since the rerun condition might have been trigged accidentally
 			if (result == LCR_RERUN_WITH_BIBLIOGRAPHY) {
-				QString tempWaitForFinished; //if it does not wait on bibtex it will fail
-                if (!runCommand(CMD_BIBLIOGRAPHY, mainFile, mainFile, 0, &tempWaitForFinished)) return false;
+                auto tempWaitForFinished = QSharedPointer<QString>::create(); // wait for bibliography completion
+                if (!runCommand(CMD_BIBLIOGRAPHY, mainFile, mainFile, 0, tempWaitForFinished)) return false;
 				remainingReRunCount--;
 			}
 			REQUIRE_RET(result == LCR_RERUN || result == LCR_RERUN_WITH_BIBLIOGRAPHY, false);
@@ -1847,7 +1847,7 @@ bool BuildManager::runCommandInternal(const ExpandedCommands &expandedCommands, 
  * \param returnCmd
  * \return
  */
-void BuildManager::runCommandInternalAsync(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QString *buffer, QString *errorMsg, QObject *returnObject,const char *returnCmd)
+void BuildManager::runCommandInternalAsync(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QSharedPointer<QString> buffer, QSharedPointer<QString> errorMsg, QObject *returnObject,const char *returnCmd)
 {
     m_expandedCommands=expandedCommands;
     m_mainFile=mainFile;
@@ -2887,7 +2887,7 @@ void ProcessX::setShowStdout(bool show)
 	stdoutEnabled = show;
 }
 
-QString *ProcessX::getStdoutBuffer()
+QSharedPointer<QString> ProcessX::getStdoutBuffer()
 {
     return stdoutBuffer;
 }
@@ -2899,17 +2899,17 @@ QString ProcessX::getStdout()
     return QString();
 }
 
-void ProcessX::setStdoutBuffer(QString *buffer)
+void ProcessX::setStdoutBuffer(QSharedPointer<QString> buffer)
 {
 	stdoutBuffer = buffer;
 }
 
-void ProcessX::setStderrBuffer(QString *buffer)
+void ProcessX::setStderrBuffer(QSharedPointer<QString> buffer)
 {
     stderrBuffer = buffer;
 }
 
-void ProcessX::setStdoutCodec(QTextCodec *codec)
+void ProcessX::setStdoutCodec(QTextCodec * codec)
 {
 	stdoutCodec = codec;
 }

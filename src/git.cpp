@@ -152,10 +152,10 @@ QString GIT::createRepositoryInFolder(QString folder)
  */
 QString GIT::runGit(QString action, QString args)
 {
-	QString output;
+    QSharedPointer<QString> output=QSharedPointer<QString>(new QString());
     emit statusMessage(QString(" GIT %1 ").arg(action));
-    emit runCommand(makeCmd(action, args), &output);
-	return output;
+    emit runCommand(makeCmd(action, args), output);
+    return *output;
 }
 
 /*!
@@ -410,10 +410,10 @@ QStringList GIT::getRepoLog(const QString &path, int maxEntries)
  */
 QString GIT::runGit(QString action,QString path, QString args)
 {
-    QString output;
+    QSharedPointer<QString> output=QSharedPointer<QString>(new QString());
     emit statusMessage(QString(" GIT %1 ").arg(action));
-    emit runCommand(makeCmd("-C "+path+" "+action, args), &output);
-    return output;
+    emit runCommand(makeCmd("-C "+path+" "+action, args), output);
+    return *output;
 }
 /*!
  * \brief run git asynchronously

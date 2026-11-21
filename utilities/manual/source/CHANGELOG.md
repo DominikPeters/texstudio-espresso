@@ -1,4 +1,12 @@
 # CHANGELOG
+## TeXstudio 4.9.10
+
+- mask API key like password in config dialog  [#4708](https://github.com/texstudio-org/texstudio/issues/4708)
+- refocus goto panel when already open [#4714](https://github.com/texstudio-org/texstudio/issues/4714)
+- fix hang for multiple run-away braces within the same argument [#4737](https://github.com/texstudio-org/texstudio/issues/4737)
+- fix memory leak on OSX [#4726](https://github.com/texstudio-org/texstudio/issues/4726)
+- search missing synctex files in pdf search path. Allows having tex/pdf in the same directory while synctex file stays in the build folder [#4742](https://github.com/texstudio-org/texstudio/pull/4742)
+
 ## TeXstudio 4.9.9
 
 - fix help/check latex installation
@@ -13,6 +21,7 @@
 - disable file explorer updates when not visible [#4700](https://github.com/texstudio-org/texstudio/issues/4700)
 - fix display of cached lines (typically disabled) [#4699](https://github.com/texstudio-org/texstudio/issues/4699)
 - make the zoom level of the pdf-viewer manually customizable [#4697](https://github.com/texstudio-org/texstudio/issues/4697)
+- fix a crash with qt/osx [#4706](https://github.com/texstudio-org/texstudio/issues/4706)
 
 ## TeXstudio 4.9.8
 
