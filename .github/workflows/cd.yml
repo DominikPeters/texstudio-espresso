@@ -10,7 +10,7 @@ permissions:
 
 env:
   OSX_QT_VERSION: 6.12.0
-  OSX_POPPLER_VERSION: 26.10.0
+  OSX_POPPLER_VERSION: 26.11.0
   OSX_QUAZIP_VERSION: 1.5
 
 jobs:
@@ -529,7 +529,7 @@ jobs:
   macosxM1:
     name: Mac OS X (M1)
     if: true
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout

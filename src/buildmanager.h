@@ -147,20 +147,20 @@ public:
     QString activeBuildRoot() const { return busyRunningCommands() ? m_mainFile.absoluteFilePath() : QString(); }
 
 public slots:
-    bool runCommand(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile = QFileInfo(), int currentLine = 0, QString *buffer = nullptr, QTextCodec *codecForBuffer = nullptr, QString *errorMsg = nullptr);
-    bool runCommandAsync(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile = QFileInfo(), int currentLine = 0, QString *buffer = nullptr, QString *errorMsg = nullptr, QObject *returnObj=nullptr,const char * returnCmd = nullptr);
+    bool runCommand(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile = QFileInfo(), int currentLine = 0, QSharedPointer<QString> buffer = nullptr, QTextCodec * codecForBuffer = nullptr, QSharedPointer<QString> errorMsg = nullptr);
+    bool runCommandAsync(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile = QFileInfo(), int currentLine = 0, QSharedPointer<QString> buffer = nullptr, QSharedPointer<QString> errorMsg = nullptr, QObject *returnObj=nullptr, const char * returnCmd = nullptr);
 	Q_INVOKABLE void killCurrentProcess();
 private:
 	bool checkExpandedCommands(const ExpandedCommands &expandedCommands);
     bool beginBuildSequence(const ExpandedCommands &commands, const QFileInfo &mainFile);
     void finishBuildSequenceAsync(bool success);
-    bool runCommandInternal(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QString *buffer = nullptr, QTextCodec *codecForBuffer = nullptr, QString *errorMsg = nullptr);
-    void runCommandInternalAsync(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QString *buffer = nullptr, QString *errorMsg = nullptr, QObject *returnObject = nullptr, const char * returnCmd = nullptr);
+    bool runCommandInternal(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QSharedPointer<QString> buffer = nullptr, QTextCodec * codecForBuffer = nullptr, QSharedPointer<QString> errorMsg = nullptr);
+    void runCommandInternalAsync(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QSharedPointer<QString> buffer = nullptr, QSharedPointer<QString> errorMsg = nullptr, QObject *returnObject = nullptr, const char * returnCmd = nullptr);
 
     ExpandedCommands m_expandedCommands;
     int m_remainingReRunCount;
     QFileInfo m_mainFile;
-    QString *m_buffer, *m_errorMsg;
+    QSharedPointer<QString> m_buffer, m_errorMsg;
     QObject *m_returnCmdObj;
     const char *m_returnCmd;
     bool m_buildSequenceActive = false;
@@ -296,11 +296,11 @@ public:
 	const QString &getCommandLine();
 	bool showStdout() const;
 	void setShowStdout(bool show);
-    QString *getStdoutBuffer();
+    QSharedPointer<QString>getStdoutBuffer();
     Q_INVOKABLE QString getStdout();
-	void setStdoutBuffer(QString *buffer);
-    void setStderrBuffer(QString *buffer);
-	void setStdoutCodec(QTextCodec *codec);
+    void setStdoutBuffer(QSharedPointer<QString> buffer);
+    void setStderrBuffer(QSharedPointer<QString> buffer);
+    void setStdoutCodec(QTextCodec * codec);
 	bool showStderr() const;
 	void setShowStderr(bool show);
 	void setOverrideEnvironment(const QStringList &env);
@@ -334,8 +334,8 @@ private:
 	QString cmd;
 	QString file;
 	bool isStarted, ended, stderrEnabled, stdoutEnabled, stdoutEnabledOverrideOn;
-    QString *stdoutBuffer,*stderrBuffer;
-	QTextCodec *stdoutCodec;
+    QSharedPointer<QString> stdoutBuffer,stderrBuffer;
+    QTextCodec * stdoutCodec;
 	QStringList overriddenEnvironment;
 	QString subCommandName, subCommandPrimary;
 	RunCommandFlags subCommandFlags;
