@@ -129,10 +129,28 @@ class LicenseEvidence(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             record = {'name': 'required-input', 'url': 'https://example.org/source.tar.xz', 'sha256': 'a' * 64}
-            with patch.object(source_release.urllib.request, 'urlopen', side_effect=OSError('HTTP 403')):
+            with patch.object(source_release.urllib.request, 'urlopen', side_effect=OSError('HTTP 403')), \
+                    patch.object(source_release.time, 'sleep'):
                 with self.assertRaisesRegex(OSError, r'required-input \(https://example.org/source.tar.xz\): HTTP 403'):
                     source_release.fetch_record(record, root, True)
             self.assertEqual(list(root.iterdir()), [])
+
+    def test_source_mirror_retry_still_requires_the_exact_checksum(self):
+        for data, accepted in ((b'exact source', True), (b'wrong source', False)):
+            with self.subTest(accepted=accepted), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                record = source_release.archive_record('ubuntu-source', 'https://mirrors.mit.edu/ubuntu/pool/source.tar.xz',
+                    [{'algorithm': 'SHA256', 'checksumValue': hashlib.sha256(b'exact source').hexdigest()}])
+                self.assertEqual(record['mirrors'], ['https://mirrors.kernel.org/ubuntu/pool/source.tar.xz'])
+                with patch.object(source_release.urllib.request, 'urlopen', side_effect=[OSError('route lost'), io.BytesIO(data)]) as request, \
+                        patch.object(source_release.time, 'sleep'):
+                    if accepted:
+                        self.assertEqual(source_release.fetch_record(record, root, True).read_bytes(), data)
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'Source checksum mismatch'):
+                            source_release.fetch_record(record, root, True)
+                        self.assertEqual(list(root.iterdir()), [])
+                    self.assertEqual([call.args[0] for call in request.call_args_list], [record['url'], record['mirrors'][0]])
 
     def test_identical_source_cached_under_formula_resource_name_is_reused(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -54,7 +54,13 @@ def archive_record(name, url, checksums, **extra):
     digest = next((c['checksumValue'] for c in checksums if c['algorithm'] == 'SHA256'), None)
     if not digest or not url.startswith('https://'):
         raise ValueError(f'No immutable HTTPS/SHA256 source evidence: {name}')
-    return {'name': name, 'url': url, 'sha256': digest, **extra}
+    record = {'name': name, 'url': url, 'sha256': digest, **extra}
+    # Preserve accessible alternatives in the public source manifest as well as
+    # using them during collection. Every mirror must match the same apt hash.
+    ubuntu = 'https://mirrors.mit.edu/ubuntu/'
+    if url.startswith(ubuntu):
+        record['mirrors'] = [url.replace(ubuntu, 'https://mirrors.kernel.org/ubuntu/', 1)]
+    return record
 
 
 def plan(inventory, destination, evidence_directory=None, build_directory=None):
@@ -166,17 +172,27 @@ def fetch_record(record, cache, allow_fetch):
         temporary = file.with_name(file.name + '.partial')
         try:
             deadline = time.monotonic() + 900
-            with urllib.request.urlopen(record['url'], timeout=60) as response, temporary.open('wb') as stream:
-                while chunk := response.read(1024 * 1024):
-                    if time.monotonic() > deadline:
-                        raise TimeoutError(f'Source download exceeded 15 minutes: {record["name"]}')
-                    stream.write(chunk)
+            urls = [record['url'], *record.get('mirrors', [])]
+            if any(not url.startswith('https://') for url in urls):
+                raise ValueError('Source downloads require HTTPS')
+            for attempt in range(3):
+                url = urls[attempt % len(urls)]
+                try:
+                    with urllib.request.urlopen(url, timeout=60) as response, temporary.open('wb') as stream:
+                        while chunk := response.read(1024 * 1024):
+                            if time.monotonic() > deadline:
+                                raise TimeoutError(f'Source download exceeded 15 minutes: {record["name"]}')
+                            stream.write(chunk)
+                    break
+                except OSError as error:
+                    temporary.unlink(missing_ok=True)
+                    if attempt == 2 or time.monotonic() > deadline:
+                        raise OSError(f'Source download failed: {record["name"]} ({url}): {error}') from error
+                    print(f'Source transfer failed: {record["name"]} ({url}); retrying', flush=True)
+                    time.sleep(attempt + 1)
             if record.get('sha256') and sha256(temporary) != record['sha256']:
                 raise ValueError(f'Source checksum mismatch: {record["name"]}')
             temporary.rename(file)
-        except OSError as error:
-            temporary.unlink(missing_ok=True)
-            raise OSError(f'Source download failed: {record["name"]} ({record["url"]}): {error}') from error
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise

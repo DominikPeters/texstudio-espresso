@@ -28,7 +28,7 @@ import source_release
 # The primary Ubuntu HTTPS archive can challenge automated source downloads.
 # This public Ubuntu mirror serves the same pool; apt's SHA256 still binds every
 # source/patch to the exact package installed on the builder.
-UBUNTU_SOURCE_ROOT = 'https://mirrors.kernel.org/ubuntu'
+UBUNTU_SOURCE_ROOT = 'https://mirrors.mit.edu/ubuntu'
 
 
 def host_path(value):
@@ -94,7 +94,7 @@ def debian_source(package, source_root, cache=None, fetch=False):
     record = next((r for r in records if r.get('Version') == release), None)
     if not record:
         if fetch and cache is not None and source_root.rstrip('/') in (
-                UBUNTU_SOURCE_ROOT, 'https://archive.ubuntu.com/ubuntu'):
+                UBUNTU_SOURCE_ROOT, 'https://mirrors.kernel.org/ubuntu', 'https://archive.ubuntu.com/ubuntu'):
             return archived_ubuntu_source(source, release, cache)
         raise ValueError(f'Exact Debian source unavailable: {source}={release}; enable deb-src for the builder repository')
     files = []
