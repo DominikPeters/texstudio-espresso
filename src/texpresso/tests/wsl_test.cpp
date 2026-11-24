@@ -23,6 +23,7 @@ private slots:
     void realEngine_data();
     void realEngine();
     void bibliographyBuild();
+    void graphicsAndFragileSource();
 };
 void WslTest::initTestCase()
 {
@@ -231,6 +232,96 @@ void WslTest::realEngine()
     manager.restart();
     QTRY_VERIFY_WITH_TIMEOUT(session->preview.valid() && session->compilerOutput.contains("WSL-RECOVERED"), 30000);
     manager.shutdown();
+}
+
+void WslTest::graphicsAndFragileSource()
+{
+    if (qEnvironmentVariableIsEmpty("TEXPRESSO_TEST_ENGINE")) QSKIP("Set TEXPRESSO_TEST_ENGINE for graphics and fragile-source integration");
+    QTemporaryDir project; QVERIFY(project.isValid());
+    QDir directory(project.path()); QVERIFY(directory.mkdir("project files"));
+    directory.cd("project files");
+    const auto root = directory.filePath("fragile.tex");
+    QImage colors(144, 72, QImage::Format_RGB32); colors.fill(Qt::red);
+    for (int y = 0; y < colors.height(); ++y) for (int x = 72; x < colors.width(); ++x) colors.setPixelColor(x, y, Qt::blue);
+    colors.setDotsPerMeterX(qRound(72 / .0254)); colors.setDotsPerMeterY(qRound(72 / .0254));
+    QVERIFY(colors.save(directory.filePath("colors.png")));
+    const QString source = R"(\documentclass{beamer}
+\setbeamertemplate{navigation symbols}{}
+\begin{document}
+\begin{frame}[fragile]
+\begin{verbatim}
+UNIQUE FRAGILE LINE
+\end{verbatim}
+\end{frame}
+\begin{frame}
+\includegraphics[trim=72bp 0bp 0bp 0bp,clip]{colors.png}
+\end{frame}
+\begin{frame}
+\includegraphics[width=120pt]{example-image.pdf}
+\end{frame}
+\begin{frame}
+\includegraphics[width=120pt]{example-image.png}
+\end{frame}
+\end{document}
+)";
+    QFile file(root); QVERIFY(file.open(QIODevice::WriteOnly)); file.write(source.toUtf8()); file.close();
+    TexpressoProcess process; TexpressoPreview preview; QString diagnostics, failure;
+    connect(&process, &TexpressoProcess::diagnostic, &preview, [&](const QString &text) { diagnostics += text; });
+    connect(&process, &TexpressoProcess::failed, &preview, [&](const QString &text) { failure = text; });
+    connect(&preview, &TexpressoPreview::failed, &preview, [&](const QString &text) { failure = text; });
+    connect(&process, &TexpressoProcess::ready, &preview, [&](const QJsonObject &features) {
+        preview.setCapabilities(features); process.send({"rerun", false}); preview.setActive(true);
+    });
+    connect(&process, &TexpressoProcess::message, &preview, &TexpressoPreview::message);
+    connect(&process, &TexpressoProcess::image, &preview, &TexpressoPreview::receive);
+    connect(&preview, &TexpressoPreview::command, &process, &TexpressoProcess::send);
+    QSignalSpy messages(&process, &TexpressoProcess::message);
+    QSignalSpy locations(&preview, &TexpressoPreview::sourceLocation), commands(&preview, &TexpressoPreview::command);
+    process.start(qEnvironmentVariable("TEXPRESSO_TEST_ENGINE"), root);
+    QTRY_VERIFY2_WITH_TIMEOUT(preview.valid() || !failure.isEmpty(), qPrintable(diagnostics), 90000);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure + diagnostics)); QVERIFY(preview.preciseSync());
+    preview.setSyncInputTags(QJsonValue::Null); preview.inverse({93, 116});
+    QTRY_COMPARE_WITH_TIMEOUT(locations.size(), 1, 30000);
+    QCOMPARE(TexpressoSession::identity(locations.last()[0].toString()), TexpressoSession::identity(root));
+    QCOMPARE(locations.last()[1].toInt(), 8); // Editable frame end, not its generated .vrb input.
+    QCOMPARE(locations.last()[2].toInt(), -1); QCOMPARE(locations.last()[3].toString(), QString());
+    int generatedTag = -1;
+    for (const auto &event : messages) {
+        const auto m = event[0].toJsonArray();
+        if (m[0] == "input-file" && m.size() > 2 && QFileInfo(m[2].toString()).suffix() == "vrb") generatedTag = m[1].toInt();
+    }
+    QVERIFY(generatedTag > 0);
+    preview.setSyncInputTags(QJsonArray{generatedTag}); preview.inverse({93, 116});
+    const auto inverse = commands.last()[0].toJsonArray();
+    QCOMPARE(inverse[0].toString(), QString("preview-inverse-precise"));
+    const auto filtered = [&] {
+        for (const auto &event : messages) {
+            const auto m = event[0].toJsonArray();
+            if (m[0] == "preview-inverse-result" && m[1] == inverse[1] && m[5].isNull()) return true;
+        }
+        return false;
+    };
+    QTRY_VERIFY_WITH_TIMEOUT(filtered(), 30000); QCOMPARE(locations.size(), 1);
+    preview.setSyncInputTags(QJsonValue::Null);
+    for (int page = 1; page < 4; ++page) {
+        preview.navigateTo(page);
+        QTRY_VERIFY2_WITH_TIMEOUT(preview.valid() || !failure.isEmpty(), qPrintable(diagnostics), 90000);
+        QVERIFY2(failure.isEmpty(), qPrintable(failure + diagnostics));
+        const auto image = preview.image().convertToFormat(QImage::Format_RGB32);
+        int red = 0, blue = 0, ink = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            const auto row = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+            for (int x = 0; x < image.width(); ++x) {
+                const auto pixel = row[x];
+                red += qRed(pixel) > 175 && qGreen(pixel) < 55 && qBlue(pixel) < 55;
+                blue += qBlue(pixel) > 175 && qRed(pixel) < 55 && qGreen(pixel) < 55;
+                ink += std::min({qRed(pixel), qGreen(pixel), qBlue(pixel)}) < 245;
+            }
+        }
+        if (page == 1) { QVERIFY2(red < 50, "The trimmed red half leaked into the preview"); QVERIFY(blue > 1000); }
+        else QVERIFY2(ink > 8000, "The TeX-tree image was not rendered");
+    }
+    process.stop();
 }
 
 void WslTest::bibliographyBuild()
