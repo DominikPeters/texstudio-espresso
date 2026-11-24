@@ -1,6 +1,6 @@
 # Bundled TeXpresso
 
-The engine is the same `DominikPeters/texpresso` `codex/unified-engine` branch pinned by
+The engine is the same `DominikPeters/texpresso` `main` branch pinned by
 texpresso-vscode. `native/texpresso` records an exact commit; update both clients
 together after testing shared engine changes. The older web-wrapper branch is
 unrelated. The app bundles its engine; users install TeX Live or MiKTeX and

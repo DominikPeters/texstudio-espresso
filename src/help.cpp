@@ -157,17 +157,19 @@ bool Help::texdocAvailableRequest(const QString &package)
 }
 void Help::texdocAvailableRequestFinished(int,QProcess::ExitStatus status){
 
-    if(status!=QProcess::NormalExit) return; // texdoc --list failed
-
     ProcessX *proc=qobject_cast<ProcessX *>(sender());
-    QString *buffer=proc->getStdoutBuffer();
+    if(!proc) return;
+    if(status!=QProcess::NormalExit){
+        return; // texdoc --list failed
+    }
+
+    QSharedPointer<QString> buffer=proc->getStdoutBuffer();
     QString cmdLine=proc->getCommandLine();
     int i=cmdLine.lastIndexOf(" ");
     QString package;
     if(i>-1){
         package=cmdLine.mid(i+1);
     }
-
 
     if(buffer==nullptr) return; // sanity check
 
@@ -184,8 +186,6 @@ void Help::texdocAvailableRequestFinished(int,QProcess::ExitStatus status){
     }
 
     emit texdocAvailableReply(package, !buffer->isEmpty(), QString());
-
-    delete buffer;
 }
 
 /*!
@@ -195,10 +195,10 @@ void Help::texdocAvailableRequestFinished(int,QProcess::ExitStatus status){
  */
 QString Help::runTexdoc(QString args)
 {
-    QString output;
+    QSharedPointer<QString> output=QSharedPointer<QString>(new QString());
     emit statusMessage(QString(" texdoc "));
-    emit runCommand(BuildManager::CMD_TEXDOC+" "+args, &output);
-    return output;
+    emit runCommand(BuildManager::CMD_TEXDOC+" "+args, output);
+    return *output;
 }
 /*!
  * \brief run texdoc command asynchronously

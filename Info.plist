@@ -50,7 +50,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>TeXstudio Espresso</string>
 	<key>CFBundleShortVersionString</key>
-	<string>4.9.9</string>
+	<string>4.9.10</string>
 	<key>AppleMagnifiedMode</key>
 	<false/>
 </dict>
