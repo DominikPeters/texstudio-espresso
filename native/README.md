@@ -16,6 +16,14 @@ behavior aligned with that implementation; eventual shared engine releases can
 replace these source builds. All build inputs are supplied explicitly; building
 does not download dependencies.
 
+The Git submodule entry is the authoritative engine commit pin. The `main`
+branch setting in `.gitmodules` and `dependencies.lock.json` identifies the branch
+for intentional updates; ordinary checkout and builds use the recorded commit,
+not the latest branch tip. Builders reject a source checkout that differs from
+that pin, and packaging rejects a runtime with a different `engineRevision`.
+Keep pin changes explicit and validate the client against the new commit before
+publishing them.
+
 Initialize the engine with `git submodule update --init native/texpresso`.
 On macOS, supply MuPDF and ICU at the versions in `dependencies.lock.json`:
 
