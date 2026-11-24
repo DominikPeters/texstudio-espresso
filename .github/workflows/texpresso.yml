@@ -24,7 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: Verify checkpoint EOF, crash and supervisor signal cleanup
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.ui_soak_minutes != '0' && 90 || 60 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
       - name: Install Qt, engine build dependencies and TeX Live
@@ -65,7 +65,7 @@ jobs:
         id: compressor
         run: python3 -c 'import json,os; open(os.environ["GITHUB_OUTPUT"], "a").write("revision=" + json.load(open("native/dependencies.lock.json"))["zlibNg"]["revision"] + "\n")'
       - name: Fetch locked zlib-ng source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: zlib-ng/zlib-ng
           ref: ${{ steps.compressor.outputs.revision }}
@@ -74,7 +74,7 @@ jobs:
       - name: Read locked renderer
         id: renderer
         run: python3 -c 'import json,os; open(os.environ["GITHUB_OUTPUT"], "a").write("revision=" + json.load(open("native/dependencies.lock.json"))["mupdf"]["revision"] + "\n")'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ArtifexSoftware/mupdf
           ref: ${{ steps.renderer.outputs.revision }}
