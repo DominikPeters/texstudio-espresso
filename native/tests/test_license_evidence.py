@@ -125,6 +125,15 @@ class LicenseEvidence(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Cached source checksum mismatch'):
                 source_release.fetch_record(record, root, False)
 
+    def test_source_download_failure_identifies_input_and_cleans_partial_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            record = {'name': 'required-input', 'url': 'https://example.org/source.tar.xz', 'sha256': 'a' * 64}
+            with patch.object(source_release.urllib.request, 'urlopen', side_effect=OSError('HTTP 403')):
+                with self.assertRaisesRegex(OSError, r'required-input \(https://example.org/source.tar.xz\): HTTP 403'):
+                    source_release.fetch_record(record, root, True)
+            self.assertEqual(list(root.iterdir()), [])
+
     def test_identical_source_cached_under_formula_resource_name_is_reused(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

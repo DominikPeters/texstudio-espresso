@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source, package_notices, collect, source_notices
+from portable_inventory import control_fields, pacman_fields, debian_source, binary_owner, archived_ubuntu_source, package_notices, collect, source_notices, UBUNTU_SOURCE_ROOT
 import subprocess
 import tempfile
 import hashlib
@@ -41,10 +41,18 @@ class PortableInventory(unittest.TestCase):
 
     def test_debian_source_urls_use_verified_index_names(self):
         metadata = 'Package: example\nVersion: 2.1-4\nChecksums-Sha256:\n ' + 'b' * 64 + ' 100 example_2.1.orig.tar.xz\nDirectory: pool/main/e/example\n'
-        with patch('portable_inventory.run', side_effect=['example\t2.1-4', metadata]):
-            record = debian_source('libexample1', 'https://archive.ubuntu.com/ubuntu')
-        self.assertEqual(record['records'][0]['sha256'], 'b' * 64)
-        self.assertEqual(record['records'][0]['url'], 'https://archive.ubuntu.com/ubuntu/pool/main/e/example/example_2.1.orig.tar.xz')
+        for source_root in ('https://archive.ubuntu.com/ubuntu', UBUNTU_SOURCE_ROOT):
+            with self.subTest(source_root=source_root), patch('portable_inventory.run', side_effect=['example\t2.1-4', metadata]):
+                record = debian_source('libexample1', source_root)
+            self.assertEqual(record['records'][0]['sha256'], 'b' * 64)
+            self.assertEqual(record['records'][0]['url'], source_root + '/pool/main/e/example/example_2.1.orig.tar.xz')
+
+    def test_ubuntu_mirror_preserves_archived_exact_version_lookup(self):
+        with tempfile.TemporaryDirectory() as temp, patch('portable_inventory.run', side_effect=['example\t2.1-4', '']), \
+                patch('portable_inventory.archived_ubuntu_source', return_value={'version': '2.1-4'}) as archived:
+            cache = Path(temp)
+            self.assertEqual(debian_source('libexample1', UBUNTU_SOURCE_ROOT, cache, True), {'version': '2.1-4'})
+            archived.assert_called_once_with('example', '2.1-4', cache)
 
     def test_archived_ubuntu_descriptor_binds_exact_old_source_and_patch(self):
         descriptor = ('-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\n'

@@ -174,6 +174,9 @@ def fetch_record(record, cache, allow_fetch):
             if record.get('sha256') and sha256(temporary) != record['sha256']:
                 raise ValueError(f'Source checksum mismatch: {record["name"]}')
             temporary.rename(file)
+        except OSError as error:
+            temporary.unlink(missing_ok=True)
+            raise OSError(f'Source download failed: {record["name"]} ({record["url"]}): {error}') from error
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise

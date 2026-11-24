@@ -25,6 +25,11 @@ from license_evidence import dictionary_evidence, copy_dictionary_notices
 from product_release import version, version_key
 import source_release
 
+# The primary Ubuntu HTTPS archive can challenge automated source downloads.
+# This public Ubuntu mirror serves the same pool; apt's SHA256 still binds every
+# source/patch to the exact package installed on the builder.
+UBUNTU_SOURCE_ROOT = 'https://mirrors.kernel.org/ubuntu'
+
 
 def host_path(value):
     # The UCRT Python is a native Windows process, even inside an MSYS2 shell.
@@ -88,7 +93,8 @@ def debian_source(package, source_root, cache=None, fetch=False):
     records = [control_fields(part) for part in data.split('\n\n')]
     record = next((r for r in records if r.get('Version') == release), None)
     if not record:
-        if fetch and cache is not None and source_root.rstrip('/') == 'https://archive.ubuntu.com/ubuntu':
+        if fetch and cache is not None and source_root.rstrip('/') in (
+                UBUNTU_SOURCE_ROOT, 'https://archive.ubuntu.com/ubuntu'):
             return archived_ubuntu_source(source, release, cache)
         raise ValueError(f'Exact Debian source unavailable: {source}={release}; enable deb-src for the builder repository')
     files = []
@@ -338,7 +344,7 @@ def main():
     parser.add_argument('--engine-evidence', type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--cache', type=Path, default=Path('.native-sources/distribution-sources'))
-    parser.add_argument('--apt-source-root', default='https://archive.ubuntu.com/ubuntu')
+    parser.add_argument('--apt-source-root', default=UBUNTU_SOURCE_ROOT)
     parser.add_argument('--fetch', action='store_true')
     args = parser.parse_args()
     collect(args)
