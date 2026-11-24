@@ -114,7 +114,7 @@ jobs:
           texstudio_texlive_repository=https://mirrors.mit.edu/CTAN/systems/texlive/tlnet
           for attempt in 1 2 3; do
             if sudo /Library/TeX/texbin/tlmgr --repository "$texstudio_texlive_repository" update --self && \
-              sudo /Library/TeX/texbin/tlmgr --repository "$texstudio_texlive_repository" install geometry amsmath hyperref xcolor fontspec refcount biblatex biber; then
+              sudo /Library/TeX/texbin/tlmgr --repository "$texstudio_texlive_repository" install geometry amsmath hyperref xcolor fontspec refcount biblatex biber beamer mwe; then
               break
             fi
             if [ "$attempt" = 3 ]; then exit 1; fi
